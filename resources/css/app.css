@@ -1,0 +1,13 @@
+/* Custom overrides on top of AdminLTE 4 + Bootstrap 5 */
+.app-wrapper {
+    min-height: 100vh;
+}
+
+.login-page .login-box {
+    width: 400px;
+    max-width: 95vw;
+}
+
+.card .card-tools .btn {
+    margin-left: 0.25rem;
+}
