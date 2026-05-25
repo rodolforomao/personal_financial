@@ -109,4 +109,48 @@ class ReceiptDraftSupplementMergeTest extends TestCase
         $this->assertSame($category->id, $extracted['category_id']);
         $this->assertSame('despeza pessoal, compra de tenis', $extracted['description']);
     }
+
+    public function test_apply_draft_supplement_resolves_combined_category_and_operation_without_colon(): void
+    {
+        $category = Category::query()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Oec empreendimentos',
+            'slug' => 'oec-empreendimentos',
+            'type' => 'income',
+            'color' => '#333',
+            'is_system' => false,
+        ]);
+
+        $company = Company::query()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'OEC',
+            'type' => CompanyType::Client,
+            'status' => 'active',
+        ]);
+
+        $operation = Operation::query()->create([
+            'workspace_id' => $this->workspace->id,
+            'company_id' => $company->id,
+            'name' => 'Oec empreendimentos',
+            'slug' => 'oec-empreendimentos',
+        ]);
+
+        $result = app(ReceiptExtractionService::class)->applyDraftSupplement(
+            [
+                'type' => TransactionType::Income->value,
+                'amount' => 1500,
+                'description' => 'Receita oec empreendimentos, responsabilidades em atraso',
+                'counterparty' => 'ENTERNET P LTDA - ME',
+            ],
+            'Categoria e operacao Oec empreendimentos',
+            $this->workspace->id,
+        );
+
+        $this->assertTrue($result['changed']);
+        $extracted = $result['extracted'];
+        $this->assertSame($category->id, $extracted['category_id']);
+        $this->assertSame($operation->id, $extracted['operation_id']);
+        $this->assertSame($company->id, $extracted['company_id']);
+        $this->assertSame('Receita oec empreendimentos, responsabilidades em atraso', $extracted['description']);
+    }
 }

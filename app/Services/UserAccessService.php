@@ -10,7 +10,7 @@ class UserAccessService
 {
     public function syncPaymentAccess(User $user): User
     {
-        if ($user->is_platform_internal || $user->hasRole('admin') || $user->access_status === User::ACCESS_BLOCKED) {
+        if ($user->is_platform_internal || $user->access_status === User::ACCESS_BLOCKED) {
             return $user;
         }
 

@@ -97,7 +97,7 @@ class User extends Authenticatable
 
     public function hasActivePlatformAccess(): bool
     {
-        if ($this->is_platform_internal || $this->hasRole('admin')) {
+        if ($this->is_platform_internal) {
             return true;
         }
 

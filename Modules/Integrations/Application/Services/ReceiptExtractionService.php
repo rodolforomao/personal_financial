@@ -358,7 +358,18 @@ class ReceiptExtractionService
 
     /**
      * @param  array<string, mixed>  $extracted
-     * @param  array{counterparty: ?string, category: ?string, company: ?string, operation: ?string, description: ?string, type: ?string}  $fields
+     * @param  array{
+     *     counterparty: ?string,
+     *     category: ?string,
+     *     company: ?string,
+     *     operation: ?string,
+     *     unit: ?string,
+     *     description: ?string,
+     *     type: ?string,
+     *     bank: ?string,
+     *     funding_source: ?string,
+     *     payment_method: ?string
+     * }  $fields
      * @return array<string, mixed>
      */
     protected function mergeSupplementFields(array $extracted, array $fields, int $workspaceId): array
@@ -431,6 +442,24 @@ class ReceiptExtractionService
                     $extracted['operation_unit_name'] = $unit->displayName();
                 }
             }
+        }
+
+        if (! empty($fields['bank'])) {
+            $extracted['bank'] = mb_substr($fields['bank'], 0, 120);
+        }
+
+        if (! empty($fields['funding_source'])) {
+            $fundingSource = $this->resolveFundingSourceFromText($fields['funding_source']);
+            $extracted['funding_source'] = $fundingSource?->value ?? FundingSource::Other->value;
+            if (empty($extracted['bank'])) {
+                $extracted['bank'] = $fundingSource && $fundingSource !== FundingSource::Other
+                    ? $fundingSource->label()
+                    : mb_substr($fields['funding_source'], 0, 120);
+            }
+        }
+
+        if (! empty($fields['payment_method'])) {
+            $extracted['payment_method'] = $this->resolvePaymentMethodFromText($fields['payment_method'])->value;
         }
 
         return $this->applyPersonalExpenseDefaults($extracted, implode(' ', array_filter($fields)), $workspaceId);
@@ -526,6 +555,35 @@ class ReceiptExtractionService
 
         return (bool) preg_match('/\b(despesa|despesas|despeza|despezas)\b/u', $lower)
             && (bool) preg_match('/\b(pessoal|pessoais|pessoa\s+f[ií]sica)\b/u', $lower);
+    }
+
+    protected function resolveFundingSourceFromText(string $text): ?FundingSource
+    {
+        $value = Str::slug($text, '_');
+
+        return FundingSource::tryFrom($value)
+            ?? FundingSource::tryFromBankSlug($value)
+            ?? FundingSource::tryFromBankName($text);
+    }
+
+    protected function resolvePaymentMethodFromText(string $text): PaymentMethod
+    {
+        $lower = mb_strtolower($text);
+        $value = Str::slug($text, '_');
+
+        return PaymentMethod::tryFrom($value) ?? match (true) {
+            str_contains($lower, 'pix') => PaymentMethod::Pix,
+            str_contains($lower, 'boleto') => PaymentMethod::Boleto,
+            str_contains($lower, 'ted') => PaymentMethod::Ted,
+            str_contains($lower, 'doc') => PaymentMethod::Doc,
+            str_contains($lower, 'debito') || str_contains($lower, 'débito') => PaymentMethod::Debit,
+            str_contains($lower, 'credito') || str_contains($lower, 'crédito') => PaymentMethod::Credit,
+            str_contains($lower, 'cartao') || str_contains($lower, 'cartão') => PaymentMethod::Card,
+            str_contains($lower, 'dinheiro') || str_contains($lower, 'cash') => PaymentMethod::Cash,
+            str_contains($lower, 'cripto') || str_contains($lower, 'crypto') => PaymentMethod::Crypto,
+            str_contains($lower, 'transfer') => PaymentMethod::Transfer,
+            default => PaymentMethod::Other,
+        };
     }
 
     protected function detectType(?string $explicit, string $rawText): TransactionType

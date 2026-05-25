@@ -41,7 +41,7 @@ class ReceiptCaptionContextResolver
                 ->where('workspace_id', $workspaceId)
                 ->where('slug', $categorySlug)
                 ->first()
-            : null;
+            : $this->resolveCategory($workspaceId, $tokens);
 
         $company = $this->resolveCompany($workspaceId, $haystack, $tokens);
         $operation = $this->resolveOperation($workspaceId, $haystack, $tokens, $company);
@@ -72,19 +72,42 @@ class ReceiptCaptionContextResolver
         $parts = preg_split('/[,;|]+/u', $caption) ?: [];
         $tokens = [];
         foreach ($parts as $part) {
-            $t = trim($part);
-            if ($t !== '' && ! $this->isIgnoredToken($t)) {
-                $tokens[] = $t;
+            foreach ($this->tokenCandidates($part) as $t) {
+                if ($t !== '' && ! $this->isIgnoredToken($t) && ! in_array($t, $tokens, true)) {
+                    $tokens[] = $t;
+                }
             }
         }
 
         return $tokens;
     }
 
+    /**
+     * @return list<string>
+     */
+    protected function tokenCandidates(string $part): array
+    {
+        $token = trim($part);
+        if ($token === '') {
+            return [];
+        }
+
+        $candidates = [$token];
+        $descriptor = '(?:receita|recebimento|entrada|despesa|despeza|gasto|sa[ií]da|categoria|empresa|opera[çc][aã]o|op|fonte|banco|contraparte|meio(?:\s+de\s+pagamento)?|forma(?:\s+de\s+pagamento)?|pagamento)';
+        $clean = preg_replace('/^(?:'.$descriptor.')(?:\s*(?:\be\b|\/|\+|,)\s*(?:'.$descriptor.'))*\s+/iu', '', $token);
+        $clean = trim((string) $clean);
+
+        if ($clean !== '' && mb_strtolower($clean) !== mb_strtolower($token)) {
+            $candidates[] = $clean;
+        }
+
+        return $candidates;
+    }
+
     protected function isIgnoredToken(string $token): bool
     {
         $lower = mb_strtolower(trim($token));
-        $ignored = config('financial.receipt_caption.ignore_tokens', []);
+        $ignored = (array) config('financial.receipt_caption.ignore_tokens', []);
 
         return in_array($lower, $ignored, true);
     }
@@ -94,7 +117,7 @@ class ReceiptCaptionContextResolver
      */
     protected function matchCategorySlug(string $haystack, array $tokens): ?string
     {
-        $keywords = config('financial.receipt_caption.category_keywords', []);
+        $keywords = (array) config('financial.receipt_caption.category_keywords', []);
         if ($keywords === []) {
             return null;
         }
@@ -123,9 +146,27 @@ class ReceiptCaptionContextResolver
     /**
      * @param  list<string>  $tokens
      */
+    protected function resolveCategory(int $workspaceId, array $tokens): ?Category
+    {
+        foreach ($tokens as $token) {
+            if (mb_strlen($token) < 4) {
+                continue;
+            }
+            $found = $this->findCategoryByName($workspaceId, $token);
+            if ($found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<string>  $tokens
+     */
     protected function resolveCompany(int $workspaceId, string $haystack, array $tokens): ?Company
     {
-        $aliases = config('financial.receipt_caption.company_aliases', []);
+        $aliases = (array) config('financial.receipt_caption.company_aliases', []);
 
         foreach ($aliases as $needle => $name) {
             if (str_contains($haystack, mb_strtolower($needle))) {
@@ -158,7 +199,7 @@ class ReceiptCaptionContextResolver
         array $tokens,
         ?Company $company,
     ): ?Operation {
-        $aliases = config('financial.receipt_caption.operation_aliases', []);
+        $aliases = (array) config('financial.receipt_caption.operation_aliases', []);
 
         foreach ($aliases as $needle => $nameOrSlug) {
             if (str_contains($haystack, mb_strtolower($needle))) {

@@ -148,6 +148,26 @@ class UserAccessManagementTest extends TestCase
         $this->assertTrue($user->access_expires_at->equalTo($payment->billing_period_ends_at));
     }
 
+    public function test_admin_role_does_not_bypass_pending_payment(): void
+    {
+        $profile = $this->profile();
+        /** @var User $user */
+        $user = User::factory()->create([
+            'is_platform_internal' => false,
+            'subscription_profile_id' => $profile->id,
+            'access_status' => User::ACCESS_PENDING_PAYMENT,
+        ]);
+
+        Role::findOrCreate('admin');
+        $user->assignRole('admin');
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertRedirect(route('subscription.pending'));
+
+        $this->assertFalse($user->fresh()->hasActivePlatformAccess());
+    }
+
     public function test_pending_user_can_generate_liquidx_pix_qr_code(): void
     {
         $this->configureLiquidx();
