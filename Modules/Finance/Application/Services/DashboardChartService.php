@@ -45,7 +45,14 @@ class DashboardChartService
     }
 
     /**
-     * @return array{labels: list<string>, values: list<float>}
+     * @return array{
+     *     labels: list<string>,
+     *     values: list<float>,
+     *     category_ids: list<int|null>,
+     *     counts: list<int>,
+     *     total: float,
+     *     month: array{from: string, to: string}
+     * }
      */
     public function expensesByCategory(int $workspaceId, ?Carbon $month = null, ?DashboardFilter $filter = null): array
     {
@@ -62,14 +69,29 @@ class DashboardChartService
             ->whereBetween('transaction_date', [$start, $end])
             ->with('category')
             ->get()
-            ->groupBy(fn ($tx) => $tx->category?->name ?? 'Sem categoria')
-            ->map(fn ($group) => round((float) $group->sum('amount'), 2))
-            ->sortDesc()
+            ->groupBy(fn ($tx) => $tx->category_id ?: 'uncategorized')
+            ->map(fn ($group) => [
+                'category_id' => $group->first()->category_id ? (int) $group->first()->category_id : null,
+                'label' => $group->first()->category?->name ?? 'Sem categoria',
+                'value' => round((float) $group->sum('amount'), 2),
+                'count' => $group->count(),
+            ])
+            ->sortByDesc('value')
+            ->values()
             ->take(8);
 
+        $total = round((float) $rows->sum('value'), 2);
+
         return [
-            'labels' => $rows->keys()->values()->all(),
-            'values' => $rows->values()->all(),
+            'labels' => $rows->pluck('label')->all(),
+            'values' => $rows->pluck('value')->all(),
+            'category_ids' => $rows->pluck('category_id')->all(),
+            'counts' => $rows->pluck('count')->all(),
+            'total' => $total,
+            'month' => [
+                'from' => $start->toDateString(),
+                'to' => $end->toDateString(),
+            ],
         ];
     }
 

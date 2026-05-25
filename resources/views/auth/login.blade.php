@@ -5,7 +5,7 @@
 <form action="{{ route('login.attempt') }}" method="POST">
     @csrf
     <div class="input-group mb-3">
-        <input type="email" name="email" class="form-control" placeholder="Email" value="{{ old('email', 'admin@financial.local') }}" required>
+        <input type="email" name="email" class="form-control" placeholder="Email" value="{{ old('email') }}" required>
         <div class="input-group-text"><span class="bi bi-envelope"></span></div>
     </div>
     <div class="input-group mb-3">
