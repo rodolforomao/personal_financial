@@ -4,6 +4,7 @@ return [
     'http' => [
         'verify_ssl' => env('HTTP_VERIFY_SSL', true),
         'ca_bundle' => env('CURL_CA_BUNDLE'),
+        'force_ipv4' => env('HTTP_FORCE_IPV4', true),
     ],
 
     'security' => [
