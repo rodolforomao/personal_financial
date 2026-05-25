@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Phase1;
 
+use App\Models\PlatformSetting;
 use App\Models\SubscriptionProfile;
 use App\Models\User;
 use App\Models\UserAccessPayment;
@@ -308,6 +309,66 @@ class UserAccessManagementTest extends TestCase
 
         $this->assertSame(User::ACCESS_ACTIVE, $user->access_status);
         $this->assertSame('paid', $payment->status);
+    }
+
+    public function test_admin_can_configure_liquidx_from_admin_settings(): void
+    {
+        [$admin, $profile] = $this->adminAndProfile();
+        config([
+            'financial.billing.liquidx.base_url' => 'https://env-liquidx.test/api',
+            'financial.billing.liquidx.api_key' => 'env-api-key',
+            'financial.billing.liquidx.integrated_code' => 'env-code',
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('admin.settings.update'), [
+                'base_url' => 'https://liquidx-admin.test/api/',
+                'integrated_code' => 'panel-code',
+                'api_key' => 'panel-api-key',
+                'integrated_payment_path' => '/integrated-payment',
+                'integrated_payment_status_path' => '/integrated-payment/status',
+                'thirdwallet' => 'panel-wallet',
+                'webhook_secret' => 'panel-secret',
+                'timeout' => 15,
+                'default_payer_phone' => '11999999999',
+            ])
+            ->assertRedirect(route('admin.settings.edit'));
+
+        $this->assertSame(
+            'panel-code',
+            PlatformSetting::query()->findOrFail('financial.billing.liquidx.integrated_code')->value,
+        );
+
+        /** @var User $user */
+        $user = User::factory()->create([
+            'subscription_profile_id' => $profile->id,
+            'access_status' => User::ACCESS_PENDING_PAYMENT,
+            'phone' => '11988887777',
+        ]);
+
+        Http::fake([
+            'liquidx-admin.test/api/integrated-payment' => Http::response([
+                'pix' => [
+                    'success' => true,
+                    'data' => [
+                        'response' => [
+                            'id' => 'depix-panel-001',
+                            'qrCopyPaste' => '000201PANELPIX',
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('subscription.payment.store'))
+            ->assertRedirect(route('subscription.pending'));
+
+        Http::assertSent(fn ($request) => $request->method() === 'POST'
+            && $request->url() === 'https://liquidx-admin.test/api/integrated-payment'
+            && $request['code'] === 'panel-code'
+            && $request['thirdwallet'] === 'panel-wallet'
+            && $request->hasHeader('Authorization', 'Bearer panel-api-key'));
     }
 
     /**

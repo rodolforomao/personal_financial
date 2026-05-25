@@ -15,6 +15,7 @@ use App\Http\Controllers\Web\DocumentController;
 use App\Http\Controllers\Web\IntegrationSettingsController;
 use App\Http\Controllers\Web\ObservabilityController;
 use App\Http\Controllers\Web\OperationController;
+use App\Http\Controllers\Web\PlatformSettingsController;
 use App\Http\Controllers\Web\PlatformUserController;
 use App\Http\Controllers\Web\ProjectController;
 use App\Http\Controllers\Web\ReceiptExtractController;
@@ -161,6 +162,8 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
             Route::post('users/{user}/payments', [PlatformUserController::class, 'confirmPayment'])->name('users.confirm-payment');
             Route::post('subscription-profiles', [PlatformUserController::class, 'storeProfile'])->name('subscription-profiles.store');
             Route::put('subscription-profiles/{subscriptionProfile}', [PlatformUserController::class, 'updateProfile'])->name('subscription-profiles.update');
+            Route::get('settings', [PlatformSettingsController::class, 'edit'])->name('settings.edit');
+            Route::put('settings', [PlatformSettingsController::class, 'update'])->name('settings.update');
         });
     });
 });

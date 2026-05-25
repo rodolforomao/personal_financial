@@ -53,12 +53,41 @@
     .admin-users-profile-actions {
         min-width: 8rem;
     }
+
+    .admin-users-diagnostic-card {
+        background: var(--bs-tertiary-bg);
+        border: 1px solid var(--bs-border-color);
+        border-radius: .75rem;
+        height: 100%;
+        padding: .85rem;
+    }
+
+    .admin-users-diagnostic-label {
+        color: var(--bs-secondary-color);
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .03em;
+        text-transform: uppercase;
+    }
 </style>
 @endpush
 
 @section('content')
 <div class="row g-3 mb-4">
-    <div class="col-md-4">
+    <div class="col-md-4 col-xl-2">
+        <div class="card admin-users-stat-card text-bg-primary h-100">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-white-50 small text-uppercase fw-semibold">Total</div>
+                    <div class="display-6 fw-bold mb-0">{{ $stats['total'] }}</div>
+                </div>
+                <span class="stat-icon">
+                    <i class="bi bi-people fs-4"></i>
+                </span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2">
         <div class="card admin-users-stat-card text-bg-success h-100">
             <div class="card-body d-flex align-items-center justify-content-between">
                 <div>
@@ -71,7 +100,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-4 col-xl-2">
         <div class="card admin-users-stat-card text-bg-warning h-100">
             <div class="card-body d-flex align-items-center justify-content-between">
                 <div>
@@ -84,7 +113,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-4 col-xl-2">
         <div class="card admin-users-stat-card text-bg-danger h-100">
             <div class="card-body d-flex align-items-center justify-content-between">
                 <div>
@@ -93,6 +122,32 @@
                 </div>
                 <span class="stat-icon">
                     <i class="bi bi-person-lock fs-4"></i>
+                </span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2">
+        <div class="card admin-users-stat-card text-bg-info h-100">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-black-50 small text-uppercase fw-semibold">Internos</div>
+                    <div class="display-6 fw-bold mb-0">{{ $stats['internal'] }}</div>
+                </div>
+                <span class="stat-icon">
+                    <i class="bi bi-shield-check fs-4"></i>
+                </span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2">
+        <div class="card admin-users-stat-card text-bg-secondary h-100">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-white-50 small text-uppercase fw-semibold">Vencidos</div>
+                    <div class="display-6 fw-bold mb-0">{{ $stats['expired'] }}</div>
+                </div>
+                <span class="stat-icon">
+                    <i class="bi bi-calendar-x fs-4"></i>
                 </span>
             </div>
         </div>
@@ -138,6 +193,7 @@
                         <thead>
                             <tr>
                                 <th>Usuário</th>
+                                <th>Dados</th>
                                 <th>Perfil</th>
                                 <th>Status</th>
                                 <th>Pagamento</th>
@@ -152,14 +208,30 @@
                                         \App\Models\User::ACCESS_BLOCKED => 'text-bg-danger',
                                         default => 'text-bg-warning',
                                     };
+                                    $prefs = $u->preferences ?? [];
+                                    $notificationPrefs = $prefs['notifications'] ?? [];
+                                    $aiPrefs = $prefs['ai'] ?? [];
+                                    $roles = $u->roles->pluck('name');
+                                    $workspaces = $u->workspaces->map(fn ($workspace) => $workspace->name.' (#'.$workspace->id.', '.$workspace->pivot->role.')');
+                                    $gmailConnection = $gmailConnections->get($u->id);
                                 @endphp
                                 <tr>
                                     <td>
                                         <div class="fw-semibold">{{ $u->name }}</div>
                                         <div class="text-muted small">{{ $u->email }}</div>
+                                        <div class="text-muted small">ID #{{ $u->id }}</div>
+                                        @if($u->phone)
+                                            <div class="text-muted small">{{ $u->phone }}</div>
+                                        @endif
                                         @if($u->is_platform_internal)
                                             <span class="badge rounded-pill text-bg-info mt-2">Interno sem cobrança de IA</span>
                                         @endif
+                                    </td>
+                                    <td>
+                                        <div class="small">Cadastro: {{ $u->created_at?->format('d/m/Y H:i') ?? '—' }}</div>
+                                        <div class="small text-muted">Atualizado: {{ $u->updated_at?->format('d/m/Y H:i') ?? '—' }}</div>
+                                        <div class="small text-muted">Roles: {{ $roles->isNotEmpty() ? $roles->join(', ') : 'sem role' }}</div>
+                                        <div class="small text-muted">Workspaces: {{ $u->workspaces->count() }}</div>
                                     </td>
                                     <td>
                                         <div class="fw-semibold">{{ $u->subscriptionProfile?->name ?? 'Sem perfil' }}</div>
@@ -192,7 +264,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted">Nenhum usuário cadastrado.</td>
+                                    <td colspan="6" class="text-center text-muted">Nenhum usuário cadastrado.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -356,6 +428,17 @@
 @endforeach
 
 @foreach($users as $u)
+    @php
+        $prefs = $u->preferences ?? [];
+        $notificationPrefs = $prefs['notifications'] ?? [];
+        $aiPrefs = $prefs['ai'] ?? [];
+        $roles = $u->roles->pluck('name');
+        $workspaces = $u->workspaces->map(fn ($workspace) => $workspace->name.' (#'.$workspace->id.', '.$workspace->pivot->role.')');
+        $gmailConnection = $gmailConnections->get($u->id);
+        $telegramLinked = !empty($notificationPrefs['telegram_chat_id']) || !empty($notificationPrefs['telegram_destination_display']);
+        $whatsappLinked = !empty($notificationPrefs['whatsapp_phone']);
+        $aiOwnKeySaved = collect($aiPrefs)->keys()->contains(fn ($key) => str_ends_with((string) $key, '_api_key_enc'));
+    @endphp
     <div class="modal fade" id="manage-user-{{ $u->id }}" tabindex="-1" aria-labelledby="manage-user-label-{{ $u->id }}" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
@@ -367,6 +450,118 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                 </div>
                 <div class="modal-body">
+                    <div class="border rounded p-3 mb-3">
+                        <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
+                            <div>
+                                <h6 class="mb-1">Diagnóstico do usuário</h6>
+                                <p class="text-muted small mb-0">Resumo administrativo para validar cadastro, acesso, plano e integrações sem exibir tokens.</p>
+                            </div>
+                            <span class="badge rounded-pill {{ $u->hasActivePlatformAccess() ? 'text-bg-success' : 'text-bg-danger' }} align-self-start">
+                                {{ $u->hasActivePlatformAccess() ? 'Acesso efetivo ativo' : 'Sem acesso efetivo' }}
+                            </span>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="admin-users-diagnostic-card">
+                                    <div class="admin-users-diagnostic-label mb-2">Conta</div>
+                                    <div class="small"><strong>ID:</strong> #{{ $u->id }}</div>
+                                    <div class="small"><strong>Nome:</strong> {{ $u->name }}</div>
+                                    <div class="small"><strong>Email:</strong> {{ $u->email }}</div>
+                                    <div class="small"><strong>Telefone:</strong> {{ $u->phone ?: 'não informado' }}</div>
+                                    <div class="small"><strong>Email verificado:</strong> {{ $u->email_verified_at?->format('d/m/Y H:i') ?? 'não' }}</div>
+                                    <div class="small"><strong>2FA:</strong> {{ $u->two_factor_enabled ? 'ativo' : 'inativo' }}</div>
+                                    <div class="small"><strong>Criado em:</strong> {{ $u->created_at?->format('d/m/Y H:i') ?? '—' }}</div>
+                                    <div class="small"><strong>Atualizado em:</strong> {{ $u->updated_at?->format('d/m/Y H:i') ?? '—' }}</div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="admin-users-diagnostic-card">
+                                    <div class="admin-users-diagnostic-label mb-2">Acesso</div>
+                                    <div class="small"><strong>Status:</strong> {{ $u->accessStatusLabel() }} <span class="text-muted">({{ $u->access_status }})</span></div>
+                                    <div class="small"><strong>Perfil:</strong> {{ $u->subscriptionProfile?->name ?? 'sem perfil' }}</div>
+                                    <div class="small"><strong>Interno:</strong> {{ $u->is_platform_internal ? 'sim' : 'não' }}</div>
+                                    <div class="small"><strong>Aprovado em:</strong> {{ $u->access_approved_at?->format('d/m/Y H:i') ?? '—' }}</div>
+                                    <div class="small"><strong>Aprovado por:</strong> {{ $u->accessApprovedBy?->name ?? '—' }}</div>
+                                    <div class="small"><strong>Último pagamento:</strong> {{ $u->last_payment_at?->format('d/m/Y H:i') ?? '—' }}</div>
+                                    <div class="small"><strong>Validade:</strong> {{ $u->access_expires_at?->format('d/m/Y H:i') ?? 'sem vencimento' }}</div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="admin-users-diagnostic-card">
+                                    <div class="admin-users-diagnostic-label mb-2">Organização</div>
+                                    <div class="small"><strong>Roles:</strong> {{ $roles->isNotEmpty() ? $roles->join(', ') : 'sem role' }}</div>
+                                    <div class="small"><strong>Workspaces:</strong></div>
+                                    @if($workspaces->isNotEmpty())
+                                        <ul class="small mb-0 ps-3">
+                                            @foreach($workspaces as $workspaceLabel)
+                                                <li>{{ $workspaceLabel }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @else
+                                        <div class="small text-muted">Nenhum workspace vinculado.</div>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="admin-users-diagnostic-card">
+                                    <div class="admin-users-diagnostic-label mb-2">Pagamento</div>
+                                    <div class="small"><strong>Total de pagamentos:</strong> {{ $u->access_payments_count }}</div>
+                                    @if($u->latestAccessPayment)
+                                        <div class="small"><strong>Último valor:</strong> {{ $u->latestAccessPayment->amountLabel() }}</div>
+                                        <div class="small"><strong>Status:</strong> {{ $u->latestAccessPayment->status }}</div>
+                                        <div class="small"><strong>Provedor:</strong> {{ $u->latestAccessPayment->provider ?: '—' }}</div>
+                                        <div class="small"><strong>Pago em:</strong> {{ $u->latestAccessPayment->paid_at?->format('d/m/Y H:i') ?? 'pendente' }}</div>
+                                        <div class="small"><strong>Período:</strong>
+                                            {{ $u->latestAccessPayment->billing_period_starts_at?->format('d/m/Y') ?? '—' }}
+                                            até
+                                            {{ $u->latestAccessPayment->billing_period_ends_at?->format('d/m/Y') ?? '—' }}
+                                        </div>
+                                    @else
+                                        <div class="small text-muted">Nenhum pagamento registrado.</div>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="admin-users-diagnostic-card">
+                                    <div class="admin-users-diagnostic-label mb-2">Integrações</div>
+                                    <div class="small"><strong>Telegram:</strong> {{ $telegramLinked ? 'vinculado' : 'não vinculado' }}</div>
+                                    <div class="small text-muted">Modo: {{ $notificationPrefs['telegram_mode'] ?? 'system' }} · Alertas: {{ !empty($notificationPrefs['notify_telegram']) ? 'sim' : 'não' }}</div>
+                                    <div class="small text-muted">Destino: {{ $notificationPrefs['telegram_destination_display'] ?? $notificationPrefs['telegram_chat_id'] ?? '—' }}</div>
+                                    <div class="small text-muted">Token próprio salvo: {{ !empty($notificationPrefs['telegram_bot_token_enc']) ? 'sim' : 'não' }}</div>
+                                    <hr class="my-2">
+                                    <div class="small"><strong>WhatsApp:</strong> {{ $whatsappLinked ? 'vinculado' : 'não vinculado' }}</div>
+                                    <div class="small text-muted">Modo: {{ $notificationPrefs['whatsapp_mode'] ?? 'system' }} · Alertas: {{ !empty($notificationPrefs['notify_whatsapp']) ? 'sim' : 'não' }}</div>
+                                    <div class="small text-muted">Número: {{ $notificationPrefs['whatsapp_phone'] ?? '—' }}</div>
+                                    <div class="small text-muted">API própria salva: {{ !empty($notificationPrefs['whatsapp_api_token_enc']) ? 'sim' : 'não' }}</div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="admin-users-diagnostic-card">
+                                    <div class="admin-users-diagnostic-label mb-2">IA e Gmail</div>
+                                    <div class="small"><strong>IA:</strong> {{ $aiPrefs['mode'] ?? 'system' }}</div>
+                                    <div class="small text-muted">Provider: {{ $aiPrefs['provider'] ?? config('financial.ai.default', 'openai') }} · Modelo: {{ $aiPrefs['model'] ?? 'padrão' }}</div>
+                                    <div class="small text-muted">Aceite plataforma: {{ !empty($aiPrefs['platform_ai_accepted_at']) ? $aiPrefs['platform_ai_accepted_at'] : 'não' }}</div>
+                                    <div class="small text-muted">Chave própria salva: {{ $aiOwnKeySaved ? 'sim' : 'não' }}</div>
+                                    <hr class="my-2">
+                                    <div class="small"><strong>Gmail:</strong> {{ $gmailConnection ? $gmailConnection->status : 'não conectado' }}</div>
+                                    @if($gmailConnection)
+                                        <div class="small text-muted">Email: {{ $gmailConnection->settings['email'] ?? $gmailConnection->credentials['email'] ?? '—' }}</div>
+                                        <div class="small text-muted">Última sincronização: {{ $gmailConnection->last_sync_at?->format('d/m/Y H:i') ?? '—' }}</div>
+                                        @if($gmailConnection->last_error)
+                                            <div class="small text-danger">Erro: {{ \Illuminate\Support\Str::limit($gmailConnection->last_error, 120) }}</div>
+                                        @endif
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <form action="{{ route('admin.users.update-access', $u) }}" method="POST" class="border rounded p-3 mb-3">
                         @csrf
                         @method('PATCH')

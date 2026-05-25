@@ -46,6 +46,7 @@ class NavigationMenuSeeder extends Seeder
             // Admin
             ['type' => 'header', 'sort_order' => 500, 'label' => 'ADMINISTRAÇÃO', 'required_role' => 'admin'],
             ['type' => 'link', 'sort_order' => 510, 'label' => 'Usuários e planos', 'route' => 'admin.users.index', 'icon' => 'bi bi-people', 'required_role' => 'admin'],
+            ['type' => 'link', 'sort_order' => 520, 'label' => 'Configurações', 'route' => 'admin.settings.edit', 'icon' => 'bi bi-gear', 'required_role' => 'admin'],
         ];
 
         foreach ($items as $item) {

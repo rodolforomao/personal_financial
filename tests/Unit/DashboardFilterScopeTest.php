@@ -56,6 +56,32 @@ class DashboardFilterScopeTest extends TestCase
         $this->assertEquals(1500.0, (float) $dashboard['current_month']->total_income);
     }
 
+    public function test_dashboard_cards_include_reconciled_transactions_like_charts(): void
+    {
+        $this->createTx(amount: 1000, status: TransactionStatus::Confirmed);
+        $this->createTx(amount: 500, status: TransactionStatus::Reconciled);
+
+        $dashboard = app(CashFlowService::class)->dashboard(
+            $this->workspace->id,
+            DashboardFilter::allOperations(),
+        );
+
+        $this->assertEquals(1500.0, (float) $dashboard['current_month']->total_income);
+    }
+
+    public function test_dashboard_cards_ignore_pending_transactions(): void
+    {
+        $this->createTx(amount: 1000, status: TransactionStatus::Confirmed);
+        $this->createTx(amount: 500, status: TransactionStatus::Pending);
+
+        $dashboard = app(CashFlowService::class)->dashboard(
+            $this->workspace->id,
+            DashboardFilter::allOperations(),
+        );
+
+        $this->assertEquals(1000.0, (float) $dashboard['current_month']->total_income);
+    }
+
     public function test_exclude_operation_ids_hides_selected_operation(): void
     {
         $hidden = $this->createOperation('Hidden', excludeFromDashboard: false);
@@ -106,7 +132,11 @@ class DashboardFilterScopeTest extends TestCase
         ]);
     }
 
-    protected function createTx(float $amount, ?int $operationId = null): void
+    protected function createTx(
+        float $amount,
+        ?int $operationId = null,
+        TransactionStatus $status = TransactionStatus::Confirmed,
+    ): void
     {
         app(CreateTransactionAction::class)->execute(new CreateTransactionData(
             workspaceId: $this->workspace->id,
@@ -115,7 +145,7 @@ class DashboardFilterScopeTest extends TestCase
             description: 'Test',
             transactionDate: now()->toDateString(),
             operationId: $operationId,
-            status: TransactionStatus::Confirmed,
+            status: $status,
         ));
     }
 }

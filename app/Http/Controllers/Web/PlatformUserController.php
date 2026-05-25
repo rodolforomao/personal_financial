@@ -14,15 +14,30 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Modules\Integrations\Infrastructure\Models\IntegrationConnection;
 
 class PlatformUserController extends Controller
 {
     public function index(): View
     {
         $users = User::query()
-            ->with(['subscriptionProfile', 'accessApprovedBy', 'latestAccessPayment'])
+            ->with([
+                'subscriptionProfile',
+                'accessApprovedBy',
+                'latestAccessPayment.subscriptionProfile',
+                'roles',
+                'workspaces',
+            ])
+            ->withCount('accessPayments')
             ->orderBy('name')
             ->paginate(25);
+
+        $gmailConnections = IntegrationConnection::query()
+            ->where('provider', 'gmail')
+            ->whereIn('user_id', $users->getCollection()->pluck('id'))
+            ->latest('updated_at')
+            ->get()
+            ->keyBy('user_id');
 
         $profiles = SubscriptionProfile::query()
             ->orderByDesc('is_active')
@@ -30,12 +45,18 @@ class PlatformUserController extends Controller
             ->get();
 
         $stats = [
+            'total' => User::query()->count(),
             'active' => User::query()->whereIn('access_status', [User::ACCESS_ACTIVE, User::ACCESS_MANUAL_RELEASE])->count(),
             'pending' => User::query()->where('access_status', User::ACCESS_PENDING_PAYMENT)->count(),
             'blocked' => User::query()->where('access_status', User::ACCESS_BLOCKED)->count(),
+            'internal' => User::query()->where('is_platform_internal', true)->count(),
+            'expired' => User::query()
+                ->whereNotNull('access_expires_at')
+                ->where('access_expires_at', '<', now())
+                ->count(),
         ];
 
-        return view('admin.users.index', compact('users', 'profiles', 'stats'));
+        return view('admin.users.index', compact('users', 'profiles', 'stats', 'gmailConnections'));
     }
 
     public function toggleInternal(Request $request, User $user): RedirectResponse

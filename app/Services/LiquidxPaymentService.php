@@ -21,7 +21,10 @@ class LiquidxPaymentService
 
     private const FAILED_STATUSES = ['expired', 'refunded', 'canceled', 'cancelled', 'error'];
 
-    public function __construct(private readonly UserAccessService $accessService) {}
+    public function __construct(
+        private readonly UserAccessService $accessService,
+        private readonly PlatformSettings $settings,
+    ) {}
 
     public function configured(): bool
     {
@@ -258,7 +261,7 @@ class LiquidxPaymentService
             'identificacao_nome' => $this->payerName($user->name),
             'identificacao_email' => $user->email,
             'identificacao_telefone' => $this->payerPhone($user->phone),
-            'thirdwallet' => config('financial.billing.liquidx.thirdwallet'),
+            'thirdwallet' => $this->configValue('thirdwallet'),
         ], fn ($value) => $value !== null && $value !== '');
     }
 
@@ -268,7 +271,7 @@ class LiquidxPaymentService
             ->baseUrl($this->baseUrl())
             ->asJson()
             ->acceptJson()
-            ->timeout((int) config('financial.billing.liquidx.timeout', 20));
+            ->timeout((int) $this->configValue('timeout', 20));
 
         $apiKey = $this->apiKey();
         if ($apiKey !== '') {
@@ -353,7 +356,7 @@ class LiquidxPaymentService
 
     private function payerPhone(?string $phone): ?string
     {
-        $phone ??= (string) config('financial.billing.liquidx.default_payer_phone', '');
+        $phone ??= (string) $this->configValue('default_payer_phone', '');
         $digits = preg_replace('/\D+/', '', $phone);
 
         if (! $digits) {
@@ -382,7 +385,7 @@ class LiquidxPaymentService
 
     private function baseUrl(): string
     {
-        return rtrim((string) config('financial.billing.liquidx.base_url'), '/');
+        return rtrim((string) $this->configValue('base_url'), '/');
     }
 
     private function baseUrlWithoutApiPath(): string
@@ -392,21 +395,29 @@ class LiquidxPaymentService
 
     private function apiKey(): string
     {
-        return (string) config('financial.billing.liquidx.api_key');
+        return (string) $this->configValue('api_key');
     }
 
     private function integratedCode(): string
     {
-        return (string) config('financial.billing.liquidx.integrated_code');
+        return (string) $this->configValue('integrated_code');
     }
 
     private function integratedPaymentPath(): string
     {
-        return (string) config('financial.billing.liquidx.integrated_payment_path', '/integrated-payment');
+        return (string) $this->configValue('integrated_payment_path', '/integrated-payment');
     }
 
     private function integratedPaymentStatusPath(): string
     {
-        return (string) config('financial.billing.liquidx.integrated_payment_status_path', '/integrated-payment/status');
+        return (string) $this->configValue('integrated_payment_status_path', '/integrated-payment/status');
+    }
+
+    private function configValue(string $key, mixed $default = null): mixed
+    {
+        return $this->settings->get(
+            "financial.billing.liquidx.{$key}",
+            config("financial.billing.liquidx.{$key}", $default),
+        );
     }
 }

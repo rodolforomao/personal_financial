@@ -21,7 +21,7 @@ class CashFlowService
         $transactions = Transaction::query()
             ->where('workspace_id', $workspaceId)
             ->forDashboard($filter)
-            ->where('status', TransactionStatus::Confirmed)
+            ->whereIn('status', [TransactionStatus::Confirmed, TransactionStatus::Reconciled])
             ->whereBetween('transaction_date', [$start, $end])
             ->get();
 
