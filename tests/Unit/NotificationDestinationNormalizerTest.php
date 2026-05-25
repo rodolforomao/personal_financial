@@ -24,6 +24,13 @@ class NotificationDestinationNormalizerTest extends TestCase
         $this->assertSame('-100123456789', NotificationDestinationNormalizer::telegram('-100123456789'));
     }
 
+    public function test_telegram_accepts_phone_number(): void
+    {
+        $this->assertSame('phone:+5511999999999', NotificationDestinationNormalizer::telegram('+55 (11) 99999-9999'));
+        $this->assertSame('phone:+5511999999999', NotificationDestinationNormalizer::telegram('5511999999999'));
+        $this->assertSame('+5511999999999', NotificationDestinationNormalizer::telegramDisplay('phone:+5511999999999'));
+    }
+
     public function test_whatsapp_normalizes_brazilian_number(): void
     {
         $this->assertSame('5511999999999', NotificationDestinationNormalizer::whatsapp('+55 (11) 99999-9999'));

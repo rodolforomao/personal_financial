@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SubscriptionProfile;
 use App\Models\User;
 use App\Services\LiquidxPaymentService;
+use App\Services\UserAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -35,7 +36,7 @@ class AuthController extends Controller
         return view('auth.register', compact('profile'));
     }
 
-    public function login(Request $request): RedirectResponse
+    public function login(Request $request, UserAccessService $accessService): RedirectResponse
     {
         $credentials = $request->validate([
             'email' => 'required|email',
@@ -53,10 +54,12 @@ class AuthController extends Controller
             session(['workspace_id' => $workspace->id]);
         }
 
-        if (! $request->user()->hasActivePlatformAccess()) {
+        $user = $accessService->syncPaymentAccess($request->user());
+
+        if (! $user->hasActivePlatformAccess()) {
             return redirect()
                 ->route('subscription.pending')
-                ->with('warning', 'Seu cadastro foi recebido. O acesso será liberado após o pagamento ou aprovação do administrador.');
+                ->with('warning', 'Seu cadastro precisa de pagamento em dia ou aprovação do administrador.');
         }
 
         return redirect()->intended(route('dashboard'));
@@ -103,9 +106,9 @@ class AuthController extends Controller
             ->with('success', 'Cadastro criado. Confirme o pagamento para liberar o acesso automaticamente.');
     }
 
-    public function pendingSubscription(Request $request, LiquidxPaymentService $payments): View|RedirectResponse
+    public function pendingSubscription(Request $request, LiquidxPaymentService $payments, UserAccessService $accessService): View|RedirectResponse
     {
-        $user = $request->user()->loadMissing('subscriptionProfile');
+        $user = $accessService->syncPaymentAccess($request->user())->loadMissing('subscriptionProfile');
 
         if ($user->hasActivePlatformAccess()) {
             return redirect()->route('dashboard');

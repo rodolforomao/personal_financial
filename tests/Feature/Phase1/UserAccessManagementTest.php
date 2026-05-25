@@ -84,6 +84,70 @@ class UserAccessManagementTest extends TestCase
         $this->assertNotNull($user->access_expires_at);
     }
 
+    public function test_expired_paid_access_is_moved_back_to_pending_payment(): void
+    {
+        $profile = $this->profile();
+        /** @var User $user */
+        $user = User::factory()->create([
+            'subscription_profile_id' => $profile->id,
+            'access_status' => User::ACCESS_ACTIVE,
+            'access_approved_at' => now()->subMonths(2),
+            'last_payment_at' => now()->subMonths(2),
+            'access_expires_at' => now()->subDay(),
+        ]);
+        UserAccessPayment::query()->create([
+            'user_id' => $user->id,
+            'subscription_profile_id' => $profile->id,
+            'amount_cents' => 2000,
+            'currency' => 'BRL',
+            'status' => 'paid',
+            'provider' => 'manual_admin',
+            'paid_at' => now()->subMonths(2),
+            'billing_period_starts_at' => now()->subMonths(2),
+            'billing_period_ends_at' => now()->subDay(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertRedirect(route('subscription.pending'));
+
+        $user->refresh();
+
+        $this->assertSame(User::ACCESS_PENDING_PAYMENT, $user->access_status);
+        $this->assertFalse($user->hasActivePlatformAccess());
+    }
+
+    public function test_pending_user_with_current_paid_payment_is_reactivated(): void
+    {
+        $profile = $this->profile();
+        /** @var User $user */
+        $user = User::factory()->create([
+            'subscription_profile_id' => $profile->id,
+            'access_status' => User::ACCESS_PENDING_PAYMENT,
+        ]);
+        $payment = UserAccessPayment::query()->create([
+            'user_id' => $user->id,
+            'subscription_profile_id' => $profile->id,
+            'amount_cents' => 2000,
+            'currency' => 'BRL',
+            'status' => 'paid',
+            'provider' => 'liquidx',
+            'paid_at' => now(),
+            'billing_period_starts_at' => now(),
+            'billing_period_ends_at' => now()->addMonthNoOverflow(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('subscription.pending'))
+            ->assertRedirect(route('dashboard'));
+
+        $user->refresh();
+
+        $this->assertSame(User::ACCESS_ACTIVE, $user->access_status);
+        $this->assertTrue($user->hasActivePlatformAccess());
+        $this->assertTrue($user->access_expires_at->equalTo($payment->billing_period_ends_at));
+    }
+
     public function test_pending_user_can_generate_liquidx_pix_qr_code(): void
     {
         $this->configureLiquidx();

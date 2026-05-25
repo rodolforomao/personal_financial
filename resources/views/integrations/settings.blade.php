@@ -34,7 +34,7 @@
                     <label class="form-label fw-semibold">Para onde enviar os alertas?</label>
                     <input type="text" name="telegram_destination" class="form-control @error('telegram_destination') is-invalid @enderror"
                         value="{{ old('telegram_destination', $prefs['telegram_destination_display'] ?? $prefs['telegram_chat_id'] ?? '') }}"
-                        placeholder="{{ $telegramHint }} ou 123456789"
+                        placeholder="+55 11 99999-9999, {{ $telegramHint }} ou 123456789"
                         autocomplete="off">
                     @error('telegram_destination')
                         <div class="invalid-feedback">{{ $message }}</div>
@@ -46,8 +46,8 @@
                         @endif
                         ou para o seu bot
                         e clique em <strong>Testar Telegram</strong> — o sistema descobre o ID automaticamente.
-                        <br>Ou cole o <strong>número do chat</strong> do @userinfobot (ex. <code>1722629689</code>).
-                        <br><span class="text-warning">@usuario sozinho não funciona em conversa privada no Telegram.</span>
+                        <br>Você pode usar <strong>telefone</strong>, <strong>@usuario</strong> ou o <strong>código do chat</strong> do @userinfobot (ex. <code>1722629689</code>).
+                        <br><span class="text-warning">Telefone e @usuario precisam que o bot já tenha recebido /start; telefone também depende do contato ter sido compartilhado com o bot.</span>
                         <br>Envie <strong>fotos/PDF/XML de comprovante ou nota fiscal</strong> ao bot — o sistema pergunta se os dados estão corretos antes de salvar.
                     </div>
                 </div>

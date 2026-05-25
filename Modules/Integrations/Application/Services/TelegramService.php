@@ -2,11 +2,14 @@
 
 namespace Modules\Integrations\Application\Services;
 
+use App\Core\Support\NotificationDestinationNormalizer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Modules\Integrations\Infrastructure\Models\WebhookLog;
 
 class TelegramService
 {
@@ -57,14 +60,34 @@ class TelegramService
         $token = $config['bot_token'] ?? null;
         $chatId = $config['chat_id'] ?? '';
 
+        if (str_starts_with((string) $chatId, 'phone:+')) {
+            $resolved = $this->discoverChatIdByPhone($token, (string) $chatId);
+            if (! $resolved) {
+                return [
+                    'ok' => false,
+                    'error' => $this->unresolvedDestinationMessage((string) $chatId),
+                ];
+            }
+
+            $retry = $this->send($resolved, $message, $token);
+            if ($retry['ok']) {
+                return ['ok' => true, 'chat_id' => $resolved];
+            }
+
+            return $retry;
+        }
+
         $result = $this->send($chatId, $message, $token);
 
         if ($result['ok']) {
             return $result;
         }
 
-        if (str_starts_with((string) $chatId, '@')) {
-            $resolved = $this->discoverChatId($token, $chatId);
+        if ($this->shouldResolveDestination((string) $chatId)) {
+            $resolved = str_starts_with((string) $chatId, 'phone:+')
+                ? $this->discoverChatIdByPhone($token, (string) $chatId)
+                : $this->discoverChatId($token, (string) $chatId);
+
             if ($resolved) {
                 $retry = $this->send($resolved, $message, $token);
                 if ($retry['ok']) {
@@ -76,16 +99,29 @@ class TelegramService
 
             return [
                 'ok' => false,
-                'error' => 'Não achamos seu chat. Abra o bot no Telegram, envie /start e clique em Testar de novo. '
-                    .'Se persistir, use o número que o @userinfobot mostra (ex.: 123456789) no campo destino.',
+                'error' => $this->unresolvedDestinationMessage((string) $chatId),
             ];
         }
 
         return $result;
     }
 
+    public function discoverChatIdByPhone(?string $botToken, string $destination): ?string
+    {
+        if (! $botToken) {
+            return null;
+        }
+
+        $digits = NotificationDestinationNormalizer::telegramPhoneDigits($destination);
+        if (! $digits) {
+            return null;
+        }
+
+        return $this->discoverChatIdFromWebhookLogs(phoneDigits: $digits);
+    }
+
     /**
-     * Resolve @usuario para chat_id numérico via getChat ou getUpdates (após /start).
+     * Resolve @usuario para chat_id numérico via getChat, webhooks recebidos ou getUpdates.
      */
     public function discoverChatId(?string $botToken, string $destination): ?string
     {
@@ -109,6 +145,11 @@ class TelegramService
         }
 
         $username = Str::lower(ltrim($chatRef, '@'));
+        $webhookChatId = $this->discoverChatIdFromWebhookLogs(username: $username);
+        if ($webhookChatId) {
+            return $webhookChatId;
+        }
+
         try {
             $updates = Http::external()->timeout(10)->get("https://api.telegram.org/bot{$botToken}/getUpdates");
         } catch (\Throwable) {
@@ -153,6 +194,72 @@ class TelegramService
             $chat = $message['chat'] ?? [];
             if (($chat['type'] ?? '') === 'private') {
                 return (string) $chat['id'];
+            }
+        }
+
+        return null;
+    }
+
+    protected function shouldResolveDestination(string $chatId): bool
+    {
+        return str_starts_with($chatId, '@') || str_starts_with($chatId, 'phone:+');
+    }
+
+    protected function unresolvedDestinationMessage(string $chatId): string
+    {
+        if (str_starts_with($chatId, 'phone:+')) {
+            return 'Não achamos seu chat pelo telefone. Abra o bot no Telegram, envie /start e compartilhe seu contato com o bot. '
+                .'Se persistir, use o código numérico que o @userinfobot mostra (ex.: 123456789) no campo destino.';
+        }
+
+        return 'Não achamos seu chat. Abra o bot no Telegram, envie /start e clique em Testar de novo. '
+            .'Se persistir, use o código numérico que o @userinfobot mostra (ex.: 123456789) no campo destino.';
+    }
+
+    protected function discoverChatIdFromWebhookLogs(?string $username = null, ?string $phoneDigits = null): ?string
+    {
+        if (! $username && ! $phoneDigits) {
+            return null;
+        }
+
+        try {
+            $logs = WebhookLog::query()
+                ->where('provider', 'telegram')
+                ->latest()
+                ->limit(200)
+                ->get(['payload']);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        foreach ($logs as $log) {
+            $message = data_get($log->payload, 'message')
+                ?? data_get($log->payload, 'edited_message');
+            if (! is_array($message)) {
+                continue;
+            }
+
+            $chat = $message['chat'] ?? [];
+            if (($chat['type'] ?? '') !== 'private') {
+                continue;
+            }
+
+            $from = $message['from'] ?? [];
+            $fromUser = isset($from['username']) ? Str::lower($from['username']) : null;
+            $chatUser = isset($chat['username']) ? Str::lower($chat['username']) : null;
+            $contactPhone = isset($message['contact']['phone_number'])
+                ? NotificationDestinationNormalizer::telegramPhoneDigits((string) $message['contact']['phone_number'])
+                : null;
+
+            $matchesUsername = $username && ($fromUser === $username || $chatUser === $username);
+            $matchesPhone = $phoneDigits && $contactPhone === $phoneDigits;
+            if (! $matchesUsername && ! $matchesPhone) {
+                continue;
+            }
+
+            $id = $chat['id'] ?? $from['id'] ?? null;
+            if ($id !== null) {
+                return (string) $id;
             }
         }
 
@@ -247,7 +354,7 @@ class TelegramService
         array $query = [],
         int $timeout = 30,
         bool $isAbsoluteUrl = false,
-    ): \Illuminate\Http\Client\Response {
+    ): Response {
         $url = $isAbsoluteUrl
             ? $tokenOrUrl
             : "https://api.telegram.org/bot{$tokenOrUrl}/{$method}";

@@ -46,10 +46,12 @@
         padding-top: 1rem;
     }
 
-    .admin-users-profile-card {
-        border: 1px solid var(--bs-border-color);
-        border-radius: .9rem;
-        padding: 1rem;
+    .admin-users-profile-description {
+        max-width: 36rem;
+    }
+
+    .admin-users-profile-actions {
+        min-width: 8rem;
     }
 </style>
 @endpush
@@ -204,109 +206,154 @@
                     <div>
                         <h3 class="h5 mb-1">Perfis e planos</h3>
                         <p class="text-muted small mb-0">
-                            Crie e atualize os planos usados no cadastro e nas liberações de acesso.
+                            Gerencie os planos usados no cadastro e nas liberações de acesso sem ocupar espaço com formulários abertos.
                         </p>
                     </div>
-                    <span class="badge rounded-pill text-bg-light align-self-start">{{ $profiles->count() }} perfil(is)</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge rounded-pill text-bg-light">{{ $profiles->count() }} perfil(is)</span>
+                        <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#create-profile-modal">
+                            <i class="bi bi-plus-lg me-1"></i>
+                            Novo perfil
+                        </button>
+                    </div>
                 </div>
 
-                <div class="row g-3">
-                    <div class="col-xl-4">
-                        <div class="card h-100 border-primary border-opacity-25">
-                            <div class="card-header bg-primary bg-opacity-10 border-0">
-                                <h4 class="h6 mb-0">Novo perfil</h4>
-                            </div>
-                            <div class="card-body">
-                                <form action="{{ route('admin.subscription-profiles.store') }}" method="POST">
-                                    @csrf
-                                    <div class="mb-3">
-                                        <label class="form-label">Nome</label>
-                                        <input type="text" name="name" class="form-control" placeholder="Mensal, Premium..." required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Valor mensal</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">R$</span>
-                                            <input type="number" name="monthly_price" class="form-control" value="20.00" min="0" step="0.01" required>
-                                        </div>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Descrição</label>
-                                        <textarea name="description" class="form-control" rows="3"></textarea>
-                                    </div>
-                                    <div class="form-check mb-3">
-                                        <input type="hidden" name="is_active" value="0">
-                                        <input class="form-check-input" type="checkbox" name="is_active" id="new-profile-active" value="1" checked>
-                                        <label class="form-check-label" for="new-profile-active">Ativo para novos cadastros</label>
-                                    </div>
-                                    <button class="btn btn-primary w-100">Criar perfil</button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-8">
-                        <div class="card h-100">
-                            <div class="card-header bg-white">
-                                <h4 class="h6 mb-0">Perfis existentes</h4>
-                            </div>
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    @forelse($profiles as $profile)
-                                        <div class="col-lg-6">
-                                            <form action="{{ route('admin.subscription-profiles.update', $profile) }}" method="POST" class="admin-users-profile-card h-100">
-                                                @csrf
-                                                @method('PUT')
-                                                <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
-                                                    <div>
-                                                        <div class="fw-semibold">{{ $profile->name }}</div>
-                                                        <div class="text-muted small">{{ $profile->monthlyPriceLabel() }}/mês</div>
-                                                    </div>
-                                                    <span class="badge rounded-pill {{ $profile->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">
-                                                        {{ $profile->is_active ? 'Ativo' : 'Inativo' }}
-                                                    </span>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1">Nome</label>
-                                                    <input type="text" name="name" class="form-control form-control-sm" value="{{ $profile->name }}" required>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1">Valor mensal</label>
-                                                    <div class="input-group input-group-sm">
-                                                        <span class="input-group-text">R$</span>
-                                                        <input type="number" name="monthly_price" class="form-control" min="0" step="0.01" value="{{ number_format($profile->monthly_price_cents / 100, 2, '.', '') }}" required>
-                                                    </div>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label class="form-label small mb-1">Descrição</label>
-                                                    <textarea name="description" class="form-control form-control-sm" rows="3">{{ $profile->description }}</textarea>
-                                                </div>
-                                                <div class="d-flex justify-content-between align-items-center">
-                                                    <div class="form-check small">
-                                                        <input type="hidden" name="is_active" value="0">
-                                                        <input class="form-check-input" type="checkbox" name="is_active" id="profile-active-{{ $profile->id }}" value="1" @checked($profile->is_active)>
-                                                        <label class="form-check-label" for="profile-active-{{ $profile->id }}">Ativo</label>
-                                                    </div>
-                                                    <button class="btn btn-sm btn-outline-primary">Atualizar</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    @empty
-                                        <div class="col-12">
-                                            <div class="text-center text-muted border rounded p-4">
-                                                Crie o primeiro perfil para definir o valor mensal.
-                                            </div>
-                                        </div>
-                                    @endforelse
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="table-responsive border rounded">
+                    <table class="table table-hover align-middle admin-users-table mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Perfil</th>
+                                <th>Valor mensal</th>
+                                <th>Status</th>
+                                <th>Descrição</th>
+                                <th class="text-end admin-users-profile-actions">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($profiles as $profile)
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">{{ $profile->name }}</div>
+                                    </td>
+                                    <td>{{ $profile->monthlyPriceLabel() }}/mês</td>
+                                    <td>
+                                        <span class="badge rounded-pill {{ $profile->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">
+                                            {{ $profile->is_active ? 'Ativo' : 'Inativo' }}
+                                        </span>
+                                    </td>
+                                    <td class="text-muted small admin-users-profile-description">
+                                        {{ $profile->description ?: 'Sem descrição' }}
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#edit-profile-{{ $profile->id }}">
+                                            <i class="bi bi-pencil-square me-1"></i>
+                                            Editar
+                                        </button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        Crie o primeiro perfil para definir o valor mensal.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="create-profile-modal" tabindex="-1" aria-labelledby="create-profile-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form action="{{ route('admin.subscription-profiles.store') }}" method="POST">
+                @csrf
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="create-profile-label">Novo perfil</h5>
+                        <div class="text-muted small">Defina nome, preço e disponibilidade do plano.</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nome</label>
+                        <input type="text" name="name" class="form-control" placeholder="Mensal, Premium..." required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Valor mensal</label>
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            <input type="number" name="monthly_price" class="form-control" value="20.00" min="0" step="0.01" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descrição</label>
+                        <textarea name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="form-check">
+                        <input type="hidden" name="is_active" value="0">
+                        <input class="form-check-input" type="checkbox" name="is_active" id="new-profile-active" value="1" checked>
+                        <label class="form-check-label" for="new-profile-active">Ativo para novos cadastros</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button class="btn btn-primary">Criar perfil</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@foreach($profiles as $profile)
+    <div class="modal fade" id="edit-profile-{{ $profile->id }}" tabindex="-1" aria-labelledby="edit-profile-label-{{ $profile->id }}" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form action="{{ route('admin.subscription-profiles.update', $profile) }}" method="POST">
+                    @csrf
+                    @method('PUT')
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title" id="edit-profile-label-{{ $profile->id }}">Editar {{ $profile->name }}</h5>
+                            <div class="text-muted small">{{ $profile->monthlyPriceLabel() }}/mês</div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Nome</label>
+                            <input type="text" name="name" class="form-control" value="{{ $profile->name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Valor mensal</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="number" name="monthly_price" class="form-control" min="0" step="0.01" value="{{ number_format($profile->monthly_price_cents / 100, 2, '.', '') }}" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Descrição</label>
+                            <textarea name="description" class="form-control" rows="3">{{ $profile->description }}</textarea>
+                        </div>
+                        <div class="form-check">
+                            <input type="hidden" name="is_active" value="0">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="profile-active-{{ $profile->id }}" value="1" @checked($profile->is_active)>
+                            <label class="form-check-label" for="profile-active-{{ $profile->id }}">Ativo</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button class="btn btn-primary">Salvar alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endforeach
 
 @foreach($users as $u)
     <div class="modal fade" id="manage-user-{{ $u->id }}" tabindex="-1" aria-labelledby="manage-user-label-{{ $u->id }}" aria-hidden="true">

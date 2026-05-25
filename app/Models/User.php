@@ -101,11 +101,15 @@ class User extends Authenticatable
             return true;
         }
 
-        if (! in_array($this->access_status, [self::ACCESS_ACTIVE, self::ACCESS_MANUAL_RELEASE], true)) {
-            return false;
+        if ($this->access_status === self::ACCESS_MANUAL_RELEASE) {
+            return $this->access_expires_at === null || $this->access_expires_at->isFuture();
         }
 
-        return $this->access_expires_at === null || $this->access_expires_at->isFuture();
+        if ($this->access_status === self::ACCESS_ACTIVE) {
+            return $this->access_expires_at !== null && $this->access_expires_at->isFuture();
+        }
+
+        return false;
     }
 
     public function accessStatusLabel(): string

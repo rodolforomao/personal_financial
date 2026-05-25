@@ -148,7 +148,7 @@ class IntegrationSettingsController extends Controller
         if ($telegramRaw && ! $telegramNormalized) {
             return back()
                 ->withInput()
-                ->withErrors(['telegram_destination' => 'Use @seu_usuario, link t.me/seu_usuario ou o número do chat (ex.: 123456789).']);
+                ->withErrors(['telegram_destination' => 'Use telefone (+55...), @seu_usuario, link t.me/seu_usuario ou o código do chat (ex.: 123456789).']);
         }
 
         $existingEnc = ($prefs['notifications'] ?? [])['telegram_bot_token_enc'] ?? null;
@@ -163,7 +163,7 @@ class IntegrationSettingsController extends Controller
                 $telegramNormalized,
                 $botToken
             );
-            $n['telegram_destination_display'] = $telegramNormalized;
+            $n['telegram_destination_display'] = NotificationDestinationNormalizer::telegramDisplay($telegramNormalized);
         } else {
             $n['telegram_chat_id'] = null;
             $n['telegram_destination_display'] = null;
@@ -211,7 +211,7 @@ class IntegrationSettingsController extends Controller
         $config = $resolver->telegram($request->user()->id, (int) $request->attributes->get('workspace_id'));
 
         if (! $config) {
-            return back()->with('warning', 'Informe para onde enviar no Telegram (@seu_usuario ou chat numérico) e o token do bot.');
+            return back()->with('warning', 'Informe para onde enviar no Telegram (telefone, @seu_usuario ou código numérico) e o token do bot.');
         }
 
         try {
@@ -306,7 +306,7 @@ class IntegrationSettingsController extends Controller
 
         $n['telegram_mode'] = $mode;
         $n['telegram_chat_id'] = NotificationDestinationNormalizer::resolveTelegramChatId($normalized, $token);
-        $n['telegram_destination_display'] = $normalized;
+        $n['telegram_destination_display'] = NotificationDestinationNormalizer::telegramDisplay($normalized);
         $prefs['notifications'] = $n;
         $user->forceFill(['preferences' => $prefs])->save();
     }

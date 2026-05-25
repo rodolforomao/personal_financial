@@ -5,8 +5,10 @@ namespace Modules\Integrations\Application\Services;
 use App\Application\Services\PlatformOperationsGuide;
 use App\Core\Enums\TransactionStatus;
 use App\Core\Enums\TransactionType;
+use App\Core\Support\NotificationDestinationNormalizer;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Modules\Finance\Application\Actions\CreateTransactionAction;
 use Modules\Finance\Application\DTOs\CreateTransactionData;
 use Modules\Finance\Application\Services\TransactionDeduplicationService;
@@ -46,31 +48,49 @@ class TelegramInboundService
 
         $text = trim((string) ($message['text'] ?? ''));
         $messageId = (string) ($message['message_id'] ?? '');
+        $user = $this->resolveUserForInboundMessage($message, $chatId);
 
         if ($text !== '' && ($this->isCommand($text, '/start') || $this->isCommand($text, '/help'))) {
-            $this->reply($chatId, $this->helpMessage(), $token);
+            $this->reply(
+                $chatId,
+                $user
+                    ? $this->helpMessage()
+                    : "Não encontrei sua conta. Configure Telegram em:\n".config('app.url')."/integrations/notifications\n".
+                        'e envie /start ao bot @'.config('financial.integrations.telegram.bot_username', 'bot').'.',
+                $token
+            );
 
             return ['handled' => true, 'reply' => 'help'];
         }
 
         if ($text !== '' && ($this->isCommand($text, '/comandos') || $this->isCommand($text, '/commands'))) {
-            $user = $this->resolveUserByChatId($chatId);
             if ($user) {
                 $this->backgroundCommands->tryHandle($text, $user, $chatId);
             } else {
-                $this->reply($chatId, "Vincule sua conta em:\n".config('app.url')."/integrations/notifications", $token);
+                $this->reply($chatId, "Vincule sua conta em:\n".config('app.url').'/integrations/notifications', $token);
             }
 
             return ['handled' => true, 'reply' => 'commands_list'];
         }
 
-        $user = $this->resolveUserByChatId($chatId);
+        if (isset($message['contact'])) {
+            $this->reply(
+                $chatId,
+                $user
+                    ? 'Telegram vinculado. Agora você pode voltar ao painel e clicar em Testar Telegram.'
+                    : 'Não encontrei sua conta por esse telefone. Confira o telefone salvo no painel ou use o código numérico do @userinfobot.',
+                $token
+            );
+
+            return ['handled' => true, 'reply' => $user ? 'contact_linked' : 'contact_unlinked'];
+        }
+
         if (! $user) {
             if ($text !== '' || $this->hasInboundDocument($message)) {
                 $this->reply(
                     $chatId,
                     "Não encontrei sua conta. Configure Telegram em:\n".config('app.url')."/integrations/notifications\n".
-                    "e envie /start ao bot @".config('financial.integrations.telegram.bot_username', 'bot').'.',
+                    'e envie /start ao bot @'.config('financial.integrations.telegram.bot_username', 'bot').'.',
                     $token
                 );
             }
@@ -174,7 +194,7 @@ class TelegramInboundService
                 "Não entendi. Envie:\n".
                 "• Foto/PDF/XML de comprovante ou nota fiscal (confirmamos antes de salvar)\n".
                 "• Texto: Gasto de 16.000 descrição\n".
-                "• /help",
+                '• /help',
                 $token
             );
 
@@ -252,6 +272,113 @@ class TelegramInboundService
                     ->orWhere('preferences->notifications->telegram_chat_id', '"'.$chatId.'"');
             })
             ->first();
+    }
+
+    protected function resolveUserForInboundMessage(array $message, string $chatId): ?User
+    {
+        $user = $this->resolveUserByChatId($chatId);
+        if ($user) {
+            return $user;
+        }
+
+        $user = $this->resolveUserByTelegramIdentity($message);
+        if (! $user) {
+            return null;
+        }
+
+        $this->persistTelegramChatId($user, $chatId);
+
+        return $user->refresh();
+    }
+
+    protected function resolveUserByTelegramIdentity(array $message): ?User
+    {
+        $username = $this->telegramUsernameFromMessage($message);
+        $phone = $this->telegramPhoneFromMessage($message);
+        if (! $username && ! $phone) {
+            return null;
+        }
+
+        $target = $username ? '@'.$username : null;
+        $user = User::query()
+            ->where(function ($q) use ($phone, $target) {
+                if ($target) {
+                    $q->orWhere('preferences->notifications->telegram_destination_display', $target)
+                        ->orWhere('preferences->notifications->telegram_chat_id', $target);
+                }
+
+                if ($phone) {
+                    $q->orWhere('preferences->notifications->telegram_destination_display', $phone)
+                        ->orWhere('preferences->notifications->telegram_chat_id', $phone);
+                }
+            })
+            ->first();
+
+        if ($user) {
+            return $user;
+        }
+
+        return User::query()
+            ->where(function ($q) {
+                $q->whereNotNull('preferences->notifications->telegram_destination_display')
+                    ->orWhereNotNull('preferences->notifications->telegram_chat_id');
+            })
+            ->get()
+            ->first(function (User $candidate) use ($phone, $target): bool {
+                $notifications = $candidate->preferences['notifications'] ?? [];
+
+                $storedDestinations = [
+                    NotificationDestinationNormalizer::telegram($notifications['telegram_destination_display'] ?? null),
+                    NotificationDestinationNormalizer::telegram($notifications['telegram_chat_id'] ?? null),
+                ];
+
+                return ($target && in_array($target, $storedDestinations, true))
+                    || ($phone && in_array($phone, $storedDestinations, true));
+            });
+    }
+
+    protected function telegramUsernameFromMessage(array $message): ?string
+    {
+        $chat = $message['chat'] ?? [];
+        if (($chat['type'] ?? '') !== 'private') {
+            return null;
+        }
+
+        $username = $message['from']['username'] ?? $chat['username'] ?? null;
+        if (! is_string($username) || trim($username) === '') {
+            return null;
+        }
+
+        return Str::lower(ltrim(trim($username), '@'));
+    }
+
+    protected function telegramPhoneFromMessage(array $message): ?string
+    {
+        $chat = $message['chat'] ?? [];
+        if (($chat['type'] ?? '') !== 'private') {
+            return null;
+        }
+
+        $phone = $message['contact']['phone_number'] ?? null;
+        if (! is_string($phone) || trim($phone) === '') {
+            return null;
+        }
+
+        return NotificationDestinationNormalizer::telegramPhone($phone);
+    }
+
+    protected function persistTelegramChatId(User $user, string $chatId): void
+    {
+        $prefs = $user->preferences ?? [];
+        $notifications = $prefs['notifications'] ?? [];
+
+        if (($notifications['telegram_chat_id'] ?? null) === $chatId) {
+            return;
+        }
+
+        $notifications['telegram_chat_id'] = $chatId;
+        $prefs['notifications'] = $notifications;
+        $user->forceFill(['preferences' => $prefs])->save();
     }
 
     protected function hasInboundDocument(array $message): bool
