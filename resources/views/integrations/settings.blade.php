@@ -8,6 +8,17 @@
 @endsection
 
 @section('content')
+<div class="card card-outline card-info mb-3">
+    <div class="card-header"><h3 class="card-title mb-0"><i class="bi bi-terminal"></i> Processos no servidor</h3></div>
+    <div class="card-body">
+        {!! $operationsGuideHtml !!}
+        <details class="mt-2">
+            <summary class="small text-muted" style="cursor:pointer">Lista completa de comandos artisan</summary>
+            <pre class="bg-light p-2 rounded small mt-2 mb-0" style="white-space:pre-wrap">{{ $operationsGuidePlain }}</pre>
+        </details>
+    </div>
+</div>
+
 <form action="{{ route('integrations.settings.update') }}" method="POST" id="integrations-form">
     @csrf
 <div class="row">
@@ -33,6 +44,7 @@
                         e clique em <strong>Testar Telegram</strong> — o sistema descobre o ID automaticamente.
                         <br>Ou cole o <strong>número do chat</strong> do @userinfobot (ex. <code>1722629689</code>).
                         <br><span class="text-warning">@usuario sozinho não funciona em conversa privada no Telegram.</span>
+                        <br>Envie <strong>fotos de comprovante</strong> ao bot — o sistema pergunta se os dados estão corretos antes de salvar.
                     </div>
                 </div>
 
@@ -43,7 +55,7 @@
                 <p class="text-muted small mb-3">
                     <strong>Lançamentos por mensagem:</strong> após vincular, envie ao bot textos como
                     <em>Gasto de 16.000 aporte Multfilmes GYN</em> — o sistema cria o lançamento se ainda não existir.
-                    Admin: <code>php artisan telegram:webhook-sync</code> (ver <code>docs/TELEGRAM_INBOUND.md</code>).
+                    No bot: <code>/ops</code> e <code>/comandos</code>. Dev: um terminal <code>php artisan schedule:work</code> (ver card acima). Produção: <code>telegram:webhook-sync</code>.
                 </p>
 
                 <div class="mb-3">

@@ -142,12 +142,18 @@ class EvolutionService
 
         $instance = $instance ?? $this->instanceName();
 
+        $webhookKey = (string) (
+            config('financial.integrations.evolution.webhook_secret')
+            ?: $this->apiKey()
+        );
+
         $response = $this->client()->post("/webhook/set/{$instance}", [
             'webhook' => [
                 'enabled' => true,
                 'url' => $url,
                 'webhookByEvents' => false,
-                'webhookBase64' => false,
+                'webhookBase64' => (bool) config('financial.integrations.evolution.webhook_base64', true),
+                'headers' => $webhookKey !== '' ? ['apikey' => $webhookKey] : null,
                 'events' => [
                     'CONNECTION_UPDATE',
                     'MESSAGES_UPSERT',
@@ -202,6 +208,115 @@ class EvolutionService
         $digits = preg_replace('/\D+/', '', $number) ?? '';
 
         return $digits;
+    }
+
+    /**
+     * Baixa mídia de mensagem recebida via webhook (quando webhookBase64 está desligado).
+     */
+    public function downloadMessageMedia(array $webhookData): ?string
+    {
+        if (! $this->configured()) {
+            return null;
+        }
+
+        $instance = $this->instanceName();
+        $messagePayload = [
+            'key' => $webhookData['key'] ?? [],
+            'message' => $webhookData['message'] ?? [],
+        ];
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            if ($attempt > 1) {
+                usleep(400_000);
+            }
+
+            try {
+                $response = $this->client(sendTimeout: 45)->post(
+                    "/chat/getBase64FromMediaMessage/{$instance}",
+                    ['message' => $messagePayload, 'convertToMp4' => false],
+                );
+            } catch (\Throwable $e) {
+                Log::info('Evolution getBase64FromMediaMessage failed', [
+                    'attempt' => $attempt,
+                    'message' => $e->getMessage(),
+                ]);
+
+                continue;
+            }
+
+            if ($response->failed()) {
+                Log::info('Evolution getBase64FromMediaMessage HTTP error', [
+                    'attempt' => $attempt,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                continue;
+            }
+
+            $saved = $this->saveBase64Response($response->json(), $webhookData);
+            if ($saved !== null) {
+                return $saved;
+            }
+        }
+
+        return null;
+    }
+
+    protected function saveBase64Response(mixed $json, array $webhookData): ?string
+    {
+        if (! is_array($json)) {
+            return null;
+        }
+
+        $base64 = $json['base64']
+            ?? data_get($json, 'data.base64')
+            ?? data_get($json, 'response.base64');
+
+        if (! is_string($base64) || $base64 === '') {
+            return null;
+        }
+
+        $mime = (string) (
+            data_get($webhookData, 'message.documentMessage.mimetype')
+            ?? data_get($webhookData, 'message.imageMessage.mimetype')
+            ?? 'image/jpeg'
+        );
+        $binary = base64_decode($base64, true) ?: base64_decode($base64);
+        $fileName = (string) data_get($webhookData, 'message.documentMessage.fileName', '');
+        [$mime, $ext] = $this->resolveDownloadedMediaType($mime, $fileName, $binary);
+        $tmp = sys_get_temp_dir().'/wa_ev_'.uniqid('', true).'.'.$ext;
+        file_put_contents($tmp, $binary);
+
+        return is_file($tmp) ? $tmp : null;
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    protected function resolveDownloadedMediaType(string $mime, string $fileName, string $binary): array
+    {
+        $lowerMime = strtolower($mime);
+        $lowerName = strtolower($fileName);
+        $prefix = ltrim(substr($binary, 0, 120));
+
+        if (str_contains($lowerMime, 'xml') || str_ends_with($lowerName, '.xml') || str_starts_with($prefix, '<?xml')) {
+            return ['application/xml', 'xml'];
+        }
+
+        if (str_contains($lowerMime, 'pdf') || str_ends_with($lowerName, '.pdf') || str_starts_with($prefix, '%PDF')) {
+            return ['application/pdf', 'pdf'];
+        }
+
+        if (str_contains($lowerMime, 'png') || str_ends_with($lowerName, '.png')) {
+            return ['image/png', 'png'];
+        }
+
+        if (str_contains($lowerMime, 'webp') || str_ends_with($lowerName, '.webp')) {
+            return ['image/webp', 'webp'];
+        }
+
+        return [$mime ?: 'image/jpeg', 'jpg'];
     }
 
     protected function client(int $connectTimeout = 5, int $sendTimeout = 15): PendingRequest

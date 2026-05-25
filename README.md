@@ -30,6 +30,8 @@ Cada módulo segue camadas **Domain → Application → Infrastructure → Prese
 
 Documentação detalhada: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) | **Prompt inicial × código:** [docs/PROMPT_TRACEABILITY.md](docs/PROMPT_TRACEABILITY.md)
 
+**Deploy (passo a passo):** [docs/DEPLOY.md](docs/DEPLOY.md) · **Dados e produção:** [docs/DADOS_E_PRODUCAO.md](docs/DADOS_E_PRODUCAO.md)
+
 ## Setup rápido (desenvolvimento)
 
 ### MySQL local (systemd — porta 3306) — recomendado
@@ -45,7 +47,9 @@ php artisan key:generate
 bash scripts/setup-mysql-local.sh
 
 php artisan serve
-php artisan queue:listen --queue=default,ocr,ai,notifications
+# Um único processo substitui poll + fila + rotina diária (com TELEGRAM_SCHEDULED_*=true no .env):
+php artisan schedule:work
+# Alternativa manual: php artisan queue:listen --queue=default,ocr,ai,notifications
 ```
 
 Manualmente: `mysql -u root -p < scripts/mysql-setup.sql` e depois `php artisan migrate --seed`.
@@ -104,6 +108,15 @@ php artisan financial:daily          # rotina diária (scheduler 06:00)
 php artisan financial:scan-alerts    # só alertas
 ```
 
+## Deploy para produção
+
+Checklist completo (backup, restore, `.env`, migrations, comprovantes): **[docs/DEPLOY.md](docs/DEPLOY.md)**
+
+```bash
+# No dev, antes do go-live:
+./scripts/backup-db.sh
+```
+
 ## Produção (Docker)
 
 ```bash
@@ -111,6 +124,10 @@ docker compose up -d
 docker compose exec app php artisan migrate --seed
 docker compose exec app php artisan horizon
 ```
+
+`scheduler` e `horizon` já sobem com `docker compose up -d` — não precisa de terminais artisan extras.
+
+No Telegram: `/ops` (processos necessários) e `/comandos` (rodar tarefas em segundo plano).
 
 ## Filas
 

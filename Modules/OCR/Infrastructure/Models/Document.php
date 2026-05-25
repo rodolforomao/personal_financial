@@ -12,7 +12,7 @@ use Modules\Finance\Infrastructure\Models\Transaction;
 class Document extends Model
 {
     protected $fillable = [
-        'workspace_id', 'user_id', 'original_name', 'storage_path',
+        'workspace_id', 'user_id', 'original_name', 'storage_path', 'content_hash',
         'mime_type', 'size', 'document_type', 'status', 'ocr_result', 'transaction_id',
     ];
 

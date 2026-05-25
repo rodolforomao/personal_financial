@@ -12,6 +12,7 @@ use Modules\Finance\FinanceModule;
 use Modules\Integrations\IntegrationsModule;
 use Modules\Intelligence\IntelligenceModule;
 use Modules\OCR\OCRModule;
+use Modules\Operations\OperationsModule;
 use Modules\Projects\ProjectsModule;
 
 class ModuleServiceProvider extends ServiceProvider
@@ -42,6 +43,7 @@ class ModuleServiceProvider extends ServiceProvider
             new FinanceModule,
             new CompaniesModule,
             new ProjectsModule,
+            new OperationsModule,
             new CategorizationModule,
             new OCRModule,
             new IntelligenceModule,

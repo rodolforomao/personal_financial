@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Application\Services\PlatformOperationsGuide;
 use App\Core\Support\IntegrationCredentialsResolver;
 use App\Core\Support\NotificationDestinationNormalizer;
 use App\Http\Controllers\Controller;
@@ -33,6 +34,8 @@ class IntegrationSettingsController extends Controller
                 'configured' => $evolution->configured(),
                 'connection' => $evolution->configured() ? $evolution->connectionState() : null,
             ],
+            'operationsGuideHtml' => app(PlatformOperationsGuide::class)->webCardHtml(),
+            'operationsGuidePlain' => app(PlatformOperationsGuide::class)->plainTextGuide(),
         ]);
     }
 

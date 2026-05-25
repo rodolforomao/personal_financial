@@ -5,8 +5,10 @@ namespace Modules\OCR\Application\Services\Providers;
 use App\Core\Contracts\OcrProviderInterface;
 use App\Core\DTOs\OcrRequestData;
 use App\Core\DTOs\OcrResultData;
+use App\Core\Support\BrazilianAmountParser;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
+use Modules\Integrations\Application\Services\ReceiptClassifier;
 
 class TesseractOcrProvider implements OcrProviderInterface
 {
@@ -33,21 +35,27 @@ class TesseractOcrProvider implements OcrProviderInterface
 
     protected function parseEntities(string $text): OcrResultData
     {
-        $amount = null;
-        if (preg_match('/R\$\s*([\d.,]+)/i', $text, $m)) {
-            $amount = (float) str_replace(['.', ','], ['', '.'], $m[1]);
-        }
+        $parser = app(BrazilianAmountParser::class);
+        $amount = $parser->extractBestFromText($text);
 
         $date = null;
         if (preg_match('/\d{2}\/\d{2}\/\d{4}/', $text, $m)) {
             $date = $m[0];
         }
 
+        $classification = app(ReceiptClassifier::class)->classify($text);
+
         return new OcrResultData(
             rawText: $text,
-            entities: ['lines' => explode("\n", trim($text))],
+            entities: [
+                'lines' => explode("\n", trim($text)),
+                'bank' => $classification['bank'],
+                'receipt_type' => $classification['receipt_type'],
+            ],
             amount: $amount,
             date: $date,
+            counterparty: null,
+            bank: $classification['bank'],
             confidence: $text ? 70.0 : 0.0,
             suggestedCategory: $this->guessCategory($text),
         );

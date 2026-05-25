@@ -1,0 +1,33 @@
+# Evolution API no VPS (Laravel nativo no Hestia + MariaDB do host).
+# Uso no servidor: docker compose -f docker-compose.production.yml --env-file .env up -d
+#
+# network_mode: host → Evolution usa 127.0.0.1:3306 (MariaDB Hestia) e escuta na porta 8081.
+services:
+  evolution-api:
+    image: atendai/evolution-api:homolog
+    container_name: financial-evolution-api
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      SERVER_PORT: "8085"
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      SERVER_URL: ${EVOLUTION_SERVER_URL:-http://127.0.0.1:8085}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: mysql
+      DATABASE_CONNECTION_URI: mysql://${EVOLUTION_DB_USERNAME}:${EVOLUTION_DB_PASSWORD}@127.0.0.1:3306/${EVOLUTION_DB_DATABASE}
+      DATABASE_CONNECTION_CLIENT_NAME: evolution_financial_prod
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      CONFIG_SESSION_PHONE_CLIENT: Chrome
+      CONFIG_SESSION_PHONE_VERSION: "2.3000.1033773198"
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      DATABASE_SAVE_DATA_HISTORIC: "false"
+      DATABASE_SAVE_DATA_LABELS: "false"
+    volumes:
+      - evolution_instances:/evolution/instances
+
+volumes:
+  evolution_instances:

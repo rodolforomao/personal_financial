@@ -4,6 +4,7 @@ return [
     'app_name' => env('APP_NAME', 'Financial Intelligence'),
     'logo' => '<b>Financial</b>IQ',
 
+    // Fallback se a tabela navigation_menu_items estiver vazia (ordem oficial: NavigationMenuSeeder).
     'menu' => [
         ['header' => 'PRINCIPAL'],
         [
@@ -23,14 +24,44 @@ return [
             'icon' => 'bi bi-tags',
         ],
         [
+            'text' => 'Auto categorização',
+            'route' => 'categorization-rules.index',
+            'icon' => 'bi bi-magic',
+        ],
+        [
             'text' => 'Empresas',
             'route' => 'companies.index',
             'icon' => 'bi bi-building',
         ],
         [
+            'text' => 'Operações',
+            'route' => 'operations.index',
+            'icon' => 'bi bi-diagram-3',
+        ],
+        [
+            'text' => 'Saneamento',
+            'route' => 'data-hygiene.index',
+            'icon' => 'bi bi-clipboard-check',
+        ],
+        [
+            'text' => 'Salário CLT',
+            'route' => 'clt-salaries.index',
+            'icon' => 'bi bi-briefcase',
+        ],
+        [
             'text' => 'Projetos',
             'route' => 'projects.index',
             'icon' => 'bi bi-kanban',
+        ],
+        [
+            'text' => 'Importar extrato',
+            'route' => 'statements.index',
+            'icon' => 'bi bi-bank2',
+        ],
+        [
+            'text' => 'Patrimônio',
+            'route' => 'assets.index',
+            'icon' => 'bi bi-piggy-bank',
         ],
         [
             'text' => 'Documentos / OCR',

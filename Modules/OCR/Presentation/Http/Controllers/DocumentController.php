@@ -5,7 +5,7 @@ namespace Modules\OCR\Presentation\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\OCR\Application\Services\OcrService;
+use Modules\OCR\Application\Services\ReceiptStorageService;
 use Modules\OCR\Infrastructure\Models\Document;
 
 class DocumentController extends Controller
@@ -20,30 +20,24 @@ class DocumentController extends Controller
         );
     }
 
-    public function store(Request $request, OcrService $ocrService): JsonResponse
+    public function store(Request $request, ReceiptStorageService $storage): JsonResponse
     {
         $request->validate([
-            'file' => 'required|file|mimes:pdf,jpg,jpeg,png,csv,ofx|max:10240',
+            'file' => 'required|file|mimes:pdf,jpg,jpeg,png,xml,csv,ofx|max:10240',
             'document_type' => 'nullable|in:receipt,invoice,statement,boleto,other',
         ]);
 
-        $file = $request->file('file');
-        $path = $file->store('documents/'.$request->attributes->get('workspace_id'), 'local');
+        $document = $storage->store(
+            (int) $request->attributes->get('workspace_id'),
+            $request->user(),
+            $request->file('file'),
+        );
 
-        $document = Document::query()->create([
-            'workspace_id' => $request->attributes->get('workspace_id'),
-            'user_id' => $request->user()->id,
-            'original_name' => $file->getClientOriginalName(),
-            'storage_path' => $path,
-            'mime_type' => $file->getMimeType(),
-            'size' => $file->getSize(),
-            'document_type' => $request->input('document_type', 'receipt'),
-            'status' => 'pending',
-        ]);
+        if ($request->filled('document_type')) {
+            $document->update(['document_type' => $request->input('document_type')]);
+        }
 
-        $ocrService->queueDocument($document);
-
-        return response()->json($document, 201);
+        return response()->json($document->fresh(), 201);
     }
 
     public function show(Document $document): JsonResponse

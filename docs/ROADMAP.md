@@ -20,27 +20,28 @@
 - [x] Painel web AdminLTE + Bootstrap (login, dashboard, CRUD básico) — ver `app/Http/Controllers/Web/`
 - [x] Inbox de alertas e insights IA (páginas `/alerts`, `/ai/insights`)
 - [x] Chat do assistente financeiro (`/ai/assistant`)
-- [x] Upload de comprovantes (`/documents`)
+- [x] Upload de comprovantes (`/documents`) + vínculo N comprovantes por transação
+- [x] **Gráficos** no dashboard (fluxo 6 meses, despesas por categoria, patrimônio) — Chart.js
+- [x] **CRUD patrimônio** (`/assets`)
 - [ ] SPA (Vue/React) com dashboards interativos
-- [ ] Gráficos de fluxo de caixa e patrimônio
 - [ ] Upload drag-and-drop (melhorar UX)
 
 **Rastreabilidade prompt inicial:** [PROMPT_TRACEABILITY.md](PROMPT_TRACEABILITY.md)
 
 ## Fase 3 — Importação e conciliação (3-4 semanas)
 
-- [ ] Importador OFX/CSV/PDF extrato
-- [ ] Conciliação automática extrato ↔ lançamentos
+- [x] Importador **OFX/CSV na UI** (`/statements`) + API legada
+- [x] Conciliação extrato ↔ lançamentos (`StatementLineMatcher`, tela de conciliação)
+- [ ] Import PDF de extrato
 - [ ] Detecção de divergências de saldo
-- [ ] Matching inteligente com IA
+- [ ] Matching inteligente com IA (além de regras data/valor/descrição)
 
 ## Fase 4 — Integrações (4-6 semanas)
 
-- [x] WhatsApp alertas via **Evolution API — Opção A** (instância única no servidor, envio de alertas, webhook básico) — ver [WHATSAPP_EVOLUTION.md](WHATSAPP_EVOLUTION.md)
-- [x] Telegram inbound — texto livre cria gasto/receita + anti-duplicata (ver [TELEGRAM_INBOUND.md](TELEGRAM_INBOUND.md))
-- [ ] Bot Telegram — anexos (comprovante/extrato) + IA
-- [ ] **WhatsApp Opção B** — instância por usuário (QR na UI, `whatsapp_instances` / mensagens / logs, reconexão, multi-sessão)
-- [ ] Webhooks bidirecionais (processamento completo de mensagens recebidas + chatbot)
+- [x] WhatsApp alertas via **Evolution API — Opção A** — ver [WHATSAPP_EVOLUTION.md](WHATSAPP_EVOLUTION.md)
+- [x] Telegram inbound — texto livre + anti-duplicata — [TELEGRAM_INBOUND.md](TELEGRAM_INBOUND.md)
+- [x] **Comprovante Telegram/WhatsApp** — OCR, confirmação SIM/NÃO, anexo à transação, parser BR (`BrazilianAmountParser`, `ReceiptClassifier`)
+- [ ] **WhatsApp Opção B** — instância por usuário (QR na UI)
 - [ ] Open Finance (plug-in desacoplado)
 - [ ] Conectores bancários
 
@@ -69,9 +70,8 @@
 
 ## Prioridades imediatas recomendadas
 
-1. Testes automatizados (Feature + Unit nos Services críticos)
-2. Import OFX/CSV — expor `StatementImportService` via API/UI (código já existe)
-3. Gráficos no dashboard + CRUD patrimônio (`assets`)
-4. Configurar Redis em staging + Horizon
-5. 2FA web + notificações email/Telegram completas
-6. Hardening de produção (HTTPS, backups MySQL, rate limits por workspace)
+1. Configurar Redis em staging + Horizon
+2. Correção de campos no fluxo comprovante (responder `valor 5000` antes de salvar)
+3. Detecção de divergência de saldo pós-importação
+4. 2FA web + hardening produção (HTTPS, backups, rate limits)
+5. Open Finance / conectores bancários

@@ -8,9 +8,12 @@
 @endsection
 
 @section('content')
+@include('finance.transactions._receipt_scanner', ['scanTarget' => 'transaction-form', 'scanTransactionId' => null])
+
 <div class="card card-primary">
-    <form action="{{ route('transactions.store') }}" method="POST">
+    <form action="{{ route('transactions.store') }}" method="POST" id="transaction-form">
         @csrf
+        <input type="hidden" name="document_id" id="tx-link-document-id" value="">
         <div class="card-body">
             <div class="row">
                 <div class="col-md-3 mb-3">
@@ -39,26 +42,19 @@
 
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Descrição</label>
-                    <input type="text" name="description" class="form-control" placeholder="Assinatura OpenAI, salário cliente X..." required>
+                    <input type="text" name="description" id="tx-description" class="form-control" placeholder="Assinatura OpenAI, salário cliente X..." required>
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Contraparte</label>
-                    <input type="text" name="counterparty" class="form-control" placeholder="Nome no extrato (auto-categoriza se vazio a categoria)">
+                    <input type="text" name="counterparty" id="tx-counterparty" class="form-control" placeholder="Nome no extrato / favorecido">
                 </div>
 
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Categoria</label>
-                    <select name="category_id" class="form-select">
-                        <option value="">— Detectar automaticamente —</option>
-                        @foreach($categories->groupBy('type') as $type => $group)
-                            <optgroup label="{{ $type === 'income' ? 'Receitas' : 'Despesas' }}">
-                                @foreach($group as $cat)
-                                    <option value="{{ $cat->id }}">{{ $cat->name }}</option>
-                                @endforeach
-                            </optgroup>
-                        @endforeach
-                    </select>
-                </div>
+                @include('finance.transactions._payment_fields')
+
+                @include('finance.transactions._category_suggestions', [
+                    'categories' => $categories,
+                    'selectedCategoryId' => old('category_id'),
+                ])
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Empresa vinculada</label>
                     <select name="company_id" class="form-select">
@@ -71,6 +67,12 @@
                     </select>
                     <small class="text-muted">Receitas: empresas que te pagam. Despesas: sua empresa ou fornecedor.</small>
                 </div>
+
+                @include('finance.transactions._operation_fields', [
+                    'operations' => $operations,
+                    'preselectedOperationId' => $preselectedOperationId ?? null,
+                    'preselectedUnitId' => $preselectedUnitId ?? null,
+                ])
 
                 <div class="col-12">
                     <div class="form-check mb-2">
@@ -101,5 +103,24 @@
 document.getElementById('is-recurring').addEventListener('change', function () {
     document.getElementById('frequency-field').style.display = this.checked ? '' : 'none';
 });
+
+(function () {
+    const docId = sessionStorage.getItem('link_document_id');
+    if (docId) {
+        const hidden = document.getElementById('tx-link-document-id');
+        if (hidden) hidden.value = docId;
+        sessionStorage.removeItem('link_document_id');
+    }
+    const raw = sessionStorage.getItem('transaction_prefill');
+    if (!raw || typeof window.applyReceiptExtract !== 'function') return;
+    try {
+        const data = JSON.parse(raw);
+        window.applyReceiptExtract(data);
+        if (data.category_suggestion && typeof window.showCategorySuggestion === 'function') {
+            window.showCategorySuggestion(data.category_suggestion);
+        }
+        sessionStorage.removeItem('transaction_prefill');
+    } catch (e) {}
+})();
 </script>
 @endpush

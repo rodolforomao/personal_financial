@@ -40,6 +40,6 @@ enum CompanyType: string
     /** Tipos exibidos no formulário web */
     public static function forForm(): array
     {
-        return [self::Own, self::Partner, self::Payer];
+        return [self::Own, self::Partner, self::Payer, self::Employer];
     }
 }

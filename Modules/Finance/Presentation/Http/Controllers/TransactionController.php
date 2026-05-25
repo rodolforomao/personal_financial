@@ -35,7 +35,11 @@ class TransactionController extends Controller
             'category_id' => 'nullable|integer',
             'company_id' => 'nullable|integer',
             'project_id' => 'nullable|integer',
+            'operation_id' => 'nullable|integer',
+            'operation_unit_id' => 'nullable|integer',
             'counterparty' => 'nullable|string|max:255',
+            'funding_source' => 'nullable|string|max:32',
+            'payment_method' => 'nullable|string|max:32',
             'due_date' => 'nullable|date',
             'status' => 'nullable|in:pending,confirmed,cancelled,reconciled',
             'is_recurring' => 'sometimes|boolean',
@@ -54,8 +58,12 @@ class TransactionController extends Controller
             categoryId: $validated['category_id'] ?? null,
             companyId: $validated['company_id'] ?? null,
             projectId: $validated['project_id'] ?? null,
+            operationId: $validated['operation_id'] ?? null,
+            operationUnitId: $validated['operation_unit_id'] ?? null,
             status: isset($validated['status']) ? TransactionStatus::from($validated['status']) : TransactionStatus::Pending,
             counterparty: $validated['counterparty'] ?? null,
+            fundingSource: $validated['funding_source'] ?? null,
+            paymentMethod: $validated['payment_method'] ?? null,
             dueDate: $validated['due_date'] ?? null,
             isRecurring: $isRecurring,
             recurrenceFrequency: $isRecurring
@@ -82,6 +90,8 @@ class TransactionController extends Controller
             'category_id' => 'sometimes|nullable|integer',
             'amount' => 'sometimes|numeric|min:0.01',
             'description' => 'sometimes|string|max:500',
+            'funding_source' => 'sometimes|nullable|string|max:32',
+            'payment_method' => 'sometimes|nullable|string|max:32',
         ]));
 
         return response()->json($transaction->fresh());

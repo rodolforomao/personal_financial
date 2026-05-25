@@ -24,12 +24,16 @@ class CreateTransactionAction
             'category_id' => $data->categoryId,
             'company_id' => $data->companyId,
             'project_id' => $data->projectId,
+            'operation_id' => $data->operationId,
+            'operation_unit_id' => $data->operationUnitId,
             'type' => $data->type,
             'status' => $data->status,
             'amount' => $data->amount,
             'description' => $data->description,
             'transaction_date' => $data->transactionDate,
             'counterparty' => $data->counterparty,
+            'funding_source' => $data->fundingSource,
+            'payment_method' => $data->paymentMethod,
             'due_date' => $data->dueDate,
             'source' => $data->source,
             'metadata' => $data->metadata,
@@ -37,11 +41,17 @@ class CreateTransactionAction
             'recurrence_frequency' => $data->recurrenceFrequency?->value,
         ];
 
-        if (! $data->categoryId && ($data->counterparty || $data->description)) {
+        $autoCategorizeSources = ['telegram', 'whatsapp', 'statement_import', 'ocr', 'api'];
+        if (
+            ! $data->categoryId
+            && in_array($data->source, $autoCategorizeSources, true)
+            && ($data->counterparty || $data->description)
+        ) {
             $suggestion = $this->categorization->suggest(
                 $data->workspaceId,
                 $data->description,
-                $data->counterparty ?? ''
+                $data->counterparty ?? '',
+                $data->type,
             );
             if ($suggestion) {
                 $attributes['category_id'] = $suggestion['category_id'];

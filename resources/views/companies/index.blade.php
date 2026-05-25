@@ -34,6 +34,7 @@
                     <th>Tipo</th>
                     <th>Participação</th>
                     <th>Receita esperada/mês</th>
+                    <th class="text-end">Ações</th>
                 </tr>
             </thead>
             <tbody>
@@ -47,9 +48,17 @@
                         </td>
                         <td>{{ $c->partnership_share ? $c->partnership_share.'%' : '—' }}</td>
                         <td>R$ {{ number_format($c->expected_monthly_revenue ?? 0, 2, ',', '.') }}</td>
+                        <td class="text-end text-nowrap">
+                            <a href="{{ route('operations.create', ['company_id' => $c->id]) }}" class="btn btn-sm btn-outline-secondary" title="Operação separada (apartamentos, etc.)">
+                                <i class="bi bi-diagram-3"></i>
+                            </a>
+                            <a href="{{ route('companies.edit', $c) }}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="text-center text-muted">Nenhuma empresa cadastrada</td></tr>
+                    <tr><td colspan="5" class="text-center text-muted">Nenhuma empresa cadastrada</td></tr>
                 @endforelse
             </tbody>
         </table>

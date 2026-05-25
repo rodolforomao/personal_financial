@@ -15,6 +15,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(FinancialPlatformSeeder::class);
+        $this->call([
+            FinancialPlatformSeeder::class,
+            NavigationMenuSeeder::class,
+        ]);
     }
 }

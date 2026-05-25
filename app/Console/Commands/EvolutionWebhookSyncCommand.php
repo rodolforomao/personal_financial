@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Application\Services\PlatformOperationsGuide;
 use Illuminate\Console\Command;
 use Modules\Integrations\Application\Services\EvolutionService;
 
@@ -52,8 +53,13 @@ class EvolutionWebhookSyncCommand extends Command
             return self::FAILURE;
         }
 
-        $url = $this->option('url')
-            ?? rtrim((string) config('app.url'), '/').'/api/v1/webhooks/whatsapp';
+        $url = $this->option('url') ?? $this->resolveWebhookUrl();
+
+        if (str_contains($url, 'localhost') || str_contains($url, '127.0.0.1')) {
+            $this->warn('A URL do webhook usa localhost — o container Evolution NÃO consegue alcançar isso.');
+            $this->line('Defina no .env: EVOLUTION_WEBHOOK_PUBLIC_URL=http://host.docker.internal:8000/api/v1/webhooks/whatsapp');
+            $this->line('(Linux Docker com extra_hosts host-gateway — já está no docker-compose.yml)');
+        }
 
         if (! $evolution->setWebhook($url)) {
             $this->error('Falha ao registrar webhook na Evolution API (instância existe mas a API recusou).');
@@ -63,7 +69,20 @@ class EvolutionWebhookSyncCommand extends Command
 
         $this->info("Webhook registrado: {$url}");
         $this->line('Envie o header apikey com EVOLUTION_API_KEY ou EVOLUTION_WEBHOOK_SECRET nas requisições da Evolution.');
+        $this->newLine();
+        $this->line(app(PlatformOperationsGuide::class)->consoleAfterWebhook('whatsapp'));
 
         return self::SUCCESS;
+    }
+
+    protected function resolveWebhookUrl(): string
+    {
+        $configured = config('financial.integrations.evolution.webhook_public_url');
+
+        if (is_string($configured) && $configured !== '') {
+            return rtrim($configured, '/');
+        }
+
+        return rtrim((string) config('app.url'), '/').'/api/v1/webhooks/whatsapp';
     }
 }

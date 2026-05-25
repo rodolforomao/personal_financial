@@ -5,10 +5,13 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use App\Core\Enums\CompanyType;
 use Modules\Categorization\Infrastructure\Models\Category;
 use Modules\Categorization\Infrastructure\Models\CategorizationRule;
+use Modules\Companies\Infrastructure\Models\Company;
 use Modules\Core\Infrastructure\Models\FeatureFlag;
 use Modules\Core\Infrastructure\Models\Workspace;
+use Modules\Operations\Infrastructure\Models\Operation;
 use Spatie\Permission\Models\Role;
 
 class FinancialPlatformSeeder extends Seeder
@@ -44,6 +47,13 @@ class FinancialPlatformSeeder extends Seeder
             ['name' => 'Infraestrutura', 'slug' => 'infraestrutura', 'type' => 'expense', 'color' => '#fd7e14'],
             ['name' => 'Cloud', 'slug' => 'cloud', 'type' => 'expense', 'color' => '#20c997'],
             ['name' => 'Compras', 'slug' => 'compras', 'type' => 'expense', 'color' => '#ffc107'],
+            ['name' => 'Transporte', 'slug' => 'transporte', 'type' => 'expense', 'color' => '#17a2b8'],
+            ['name' => 'Viagem & hospedagem', 'slug' => 'viagem', 'type' => 'expense', 'color' => '#6f42c1'],
+            ['name' => 'Alimentação', 'slug' => 'alimentacao', 'type' => 'expense', 'color' => '#e67e22'],
+            ['name' => 'Saúde', 'slug' => 'saude', 'type' => 'expense', 'color' => '#e74c3c'],
+            ['name' => 'Contas recorrentes', 'slug' => 'contas-recorrentes', 'type' => 'expense', 'color' => '#7f8c8d'],
+            ['name' => 'Combustível', 'slug' => 'combustivel', 'type' => 'expense', 'color' => '#f39c12'],
+            ['name' => 'Utilidades', 'slug' => 'utilidades', 'type' => 'expense', 'color' => '#3498db'],
             ['name' => 'Marketing', 'slug' => 'marketing', 'type' => 'expense', 'color' => '#e83e8c'],
             ['name' => 'Impostos', 'slug' => 'impostos', 'type' => 'expense', 'color' => '#343a40'],
             ['name' => 'Salários & Pró-labore', 'slug' => 'salarios', 'type' => 'expense', 'color' => '#198754'],
@@ -51,6 +61,8 @@ class FinancialPlatformSeeder extends Seeder
             ['name' => 'Receitas clientes', 'slug' => 'receitas-clientes', 'type' => 'income', 'color' => '#198754'],
             ['name' => 'Dividendos / Sócio', 'slug' => 'dividendos', 'type' => 'income', 'color' => '#0dcaf0'],
             ['name' => 'Outras receitas', 'slug' => 'receitas', 'type' => 'income', 'color' => '#28a745'],
+            ['name' => 'Aluguel - Airbnb', 'slug' => 'aluguel-airbnb', 'type' => 'income', 'color' => '#ff5a5f'],
+            ['name' => 'Salário CLT', 'slug' => 'salario-clt', 'type' => 'income', 'color' => '#157347'],
         ];
 
         foreach ($categories as $cat) {
@@ -69,12 +81,46 @@ class FinancialPlatformSeeder extends Seeder
                         'pattern' => $pattern,
                     ],
                     [
+                        'name' => ucfirst($pattern),
                         'category_id' => $category->id,
                         'match_type' => 'contains',
-                        'priority' => 10,
+                        'priority' => 100,
                     ]
                 );
             }
+        }
+
+        $featuredRules = [
+            ['name' => 'Evento B3', 'pattern' => 'evento b3', 'slug' => 'dividendos', 'transaction_type' => 'income', 'priority' => 10],
+            ['name' => 'Airbnb', 'pattern' => 'airbnb', 'slug' => 'aluguel-airbnb', 'transaction_type' => 'income', 'priority' => 12],
+            ['name' => 'Uber Eats', 'pattern' => 'uber eats', 'slug' => 'alimentacao', 'transaction_type' => 'expense', 'priority' => 15],
+            ['name' => 'Uber', 'pattern' => 'uber', 'slug' => 'transporte', 'transaction_type' => 'expense', 'priority' => 25],
+        ];
+
+        foreach ($featuredRules as $rule) {
+            $category = Category::query()
+                ->where('workspace_id', $workspace->id)
+                ->where('slug', $rule['slug'])
+                ->first();
+
+            if (! $category) {
+                continue;
+            }
+
+            CategorizationRule::query()->updateOrCreate(
+                [
+                    'workspace_id' => $workspace->id,
+                    'pattern' => $rule['pattern'],
+                ],
+                [
+                    'name' => $rule['name'],
+                    'category_id' => $category->id,
+                    'match_type' => 'contains',
+                    'transaction_type' => $rule['transaction_type'],
+                    'priority' => $rule['priority'],
+                    'is_active' => true,
+                ]
+            );
         }
 
         $flags = [
@@ -91,5 +137,23 @@ class FinancialPlatformSeeder extends Seeder
                 ['enabled' => in_array($flag, ['ai_financial_analysis', 'ai_categorization'])]
             );
         }
+
+        $oliveiras = Company::query()->firstOrCreate(
+            ['workspace_id' => $workspace->id, 'name' => 'Residencial Oliveiras'],
+            ['type' => CompanyType::Own, 'status' => 'active'],
+        );
+        if ($oliveiras->type !== CompanyType::Own) {
+            $oliveiras->update(['type' => CompanyType::Own]);
+        }
+
+        Operation::query()->firstOrCreate(
+            ['workspace_id' => $workspace->id, 'slug' => 'residencial-oliveiras'],
+            [
+                'company_id' => $oliveiras->id,
+                'name' => 'Residencial Oliveiras',
+                'description' => 'Airbnb, aluguel por temporada',
+                'exclude_from_main_dashboard' => true,
+            ],
+        );
     }
 }

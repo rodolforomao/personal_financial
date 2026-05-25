@@ -43,7 +43,7 @@ class TelegramTransactionIntentParser
             return TransactionType::Expense;
         }
 
-        if (preg_match('/\b(receita|recebi|ganho|ganhei|entrada|vendi|venda|faturamento)\b/u', $lower)) {
+        if (preg_match('/\b(receita|recebi|recebimento|recebido|ganho|ganhei|entrada|vendi|venda|faturamento)\b/u', $lower)) {
             return TransactionType::Income;
         }
 

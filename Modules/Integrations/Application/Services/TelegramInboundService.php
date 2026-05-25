@@ -2,6 +2,7 @@
 
 namespace Modules\Integrations\Application\Services;
 
+use App\Application\Services\PlatformOperationsGuide;
 use App\Core\Enums\TransactionStatus;
 use App\Core\Enums\TransactionType;
 use App\Models\User;
@@ -17,6 +18,10 @@ class TelegramInboundService
         protected TelegramService $telegram,
         protected CreateTransactionAction $createTransaction,
         protected TransactionDeduplicationService $deduplication,
+        protected InboundReceiptFlowService $receiptFlow,
+        protected ReceiptConfirmationService $receiptConfirmation,
+        protected TelegramBackgroundCommandService $backgroundCommands,
+        protected PlatformOperationsGuide $operationsGuide,
     ) {}
 
     /**
@@ -29,15 +34,8 @@ class TelegramInboundService
             return ['handled' => false];
         }
 
-        $text = trim((string) ($message['text'] ?? ''));
         $chatId = (string) ($message['chat']['id'] ?? '');
-        $messageId = (string) ($message['message_id'] ?? '');
-
-        if ($text === '' || $chatId === '') {
-            return ['handled' => false];
-        }
-
-        if (! empty($message['from']['is_bot'])) {
+        if ($chatId === '' || ! empty($message['from']['is_bot'])) {
             return ['handled' => false];
         }
 
@@ -46,43 +44,147 @@ class TelegramInboundService
             return ['handled' => false];
         }
 
-        if ($this->isCommand($text, '/start') || $this->isCommand($text, '/help')) {
-            $this->telegram->send($chatId, $this->helpMessage(), $token);
+        $text = trim((string) ($message['text'] ?? ''));
+        $messageId = (string) ($message['message_id'] ?? '');
+
+        if ($text !== '' && ($this->isCommand($text, '/start') || $this->isCommand($text, '/help'))) {
+            $this->reply($chatId, $this->helpMessage(), $token);
 
             return ['handled' => true, 'reply' => 'help'];
         }
 
+        if ($text !== '' && ($this->isCommand($text, '/ops') || $this->isCommand($text, '/status') || $this->isCommand($text, '/processos'))) {
+            $this->reply($chatId, $this->operationsGuide->operationsStatus(), $token);
+
+            return ['handled' => true, 'reply' => 'ops_status'];
+        }
+
+        if ($text !== '' && ($this->isCommand($text, '/comandos') || $this->isCommand($text, '/commands'))) {
+            $user = $this->resolveUserByChatId($chatId);
+            if ($user) {
+                $this->backgroundCommands->tryHandle($text, $user, $chatId);
+            } else {
+                $this->reply($chatId, "Vincule sua conta em:\n".config('app.url')."/integrations/notifications", $token);
+            }
+
+            return ['handled' => true, 'reply' => 'commands_list'];
+        }
+
         $user = $this->resolveUserByChatId($chatId);
         if (! $user) {
-            $this->telegram->send(
-                $chatId,
-                "Não encontrei sua conta. Configure Telegram em:\n".config('app.url')."/integrations/notifications\n".
-                "e envie /start ao bot @".config('financial.integrations.telegram.bot_username', 'bot').'.',
-                $token
-            );
+            if ($text !== '' || $this->hasInboundDocument($message)) {
+                $this->reply(
+                    $chatId,
+                    "Não encontrei sua conta. Configure Telegram em:\n".config('app.url')."/integrations/notifications\n".
+                    "e envie /start ao bot @".config('financial.integrations.telegram.bot_username', 'bot').'.',
+                    $token
+                );
+            }
 
             return ['handled' => true, 'reply' => 'unlinked'];
         }
 
+        $workspaceId = (int) $user->workspaces()->value('workspaces.id');
+        if ($workspaceId < 1) {
+            $this->reply($chatId, 'Sua conta não tem workspace ativo.', $token);
+
+            return ['handled' => true, 'reply' => 'no_workspace'];
+        }
+
+        if ($text !== '') {
+            $background = $this->backgroundCommands->tryHandle($text, $user, $chatId);
+            if ($background !== null) {
+                if (($background['reply'] ?? '') !== 'commands_list') {
+                    $alias = $this->extractRunAlias($text);
+                    $this->reply(
+                        $chatId,
+                        $this->backgroundCommands->replyForAction($background['reply'] ?? '', $alias),
+                        $token,
+                    );
+                }
+
+                return ['handled' => true, 'reply' => $background['reply'] ?? 'background'];
+            }
+
+            $confirm = $this->receiptFlow->handleConfirmationText($user, 'telegram', $chatId, $text);
+            if ($confirm) {
+                $this->reply($chatId, $confirm['reply'], $token);
+
+                return ['handled' => true, 'reply' => $confirm['reply'] === 'receipt_confirm' ? 'receipt_confirm' : 'receipt_supplement'];
+            }
+        }
+
+        $fileId = $this->extractInboundFileId($message);
+        if ($fileId) {
+            $download = $this->telegram->downloadFile($fileId, $token);
+            if (! ($download['ok'] ?? false)) {
+                $this->reply($chatId, $download['error'] ?? 'Falha ao baixar imagem.', $token);
+
+                return ['handled' => true, 'reply' => 'download_failed'];
+            }
+
+            $caption = trim((string) ($message['caption'] ?? ''));
+            $fileName = (string) ($message['document']['file_name'] ?? '');
+            $this->reply($chatId, '⏳ Lendo comprovante...', $token);
+            $flow = $this->receiptFlow->handleMedia(
+                $user,
+                $workspaceId,
+                'telegram',
+                $chatId,
+                $messageId,
+                $download['path'],
+                $download['mime'] ?? 'image/jpeg',
+                $caption !== '' ? $caption : null,
+                $fileName !== '' ? $fileName : null,
+            );
+            $this->reply($chatId, $flow['reply'], $token);
+            if (isset($download['path']) && is_file($download['path'])) {
+                @unlink($download['path']);
+            }
+
+            return ['handled' => true, 'reply' => 'receipt_draft'];
+        }
+
+        if ($text === '') {
+            return ['handled' => false];
+        }
+
+        return $this->handleTextTransaction($user, $workspaceId, $chatId, $messageId, $text, $token);
+    }
+
+    /**
+     * @return array{handled: bool, reply?: string}
+     */
+    protected function handleTextTransaction(
+        User $user,
+        int $workspaceId,
+        string $chatId,
+        string $messageId,
+        string $text,
+        string $token,
+    ): array {
+        if ($this->receiptConfirmation->findPendingDraft($user, 'telegram', $chatId)) {
+            $this->reply(
+                $chatId,
+                "Você tem um comprovante aguardando confirmação.\nResponda SIM ou NÃO antes de outro lançamento.",
+                $token
+            );
+
+            return ['handled' => true, 'reply' => 'pending_receipt'];
+        }
+
         $intent = $this->parser->parse($text);
         if (! $intent) {
-            $this->telegram->send(
+            $this->reply(
                 $chatId,
-                "Não entendi o lançamento. Exemplo:\n".
-                "• Gasto de 16.000 aporte sociedade Multfilmes GYN\n".
-                "• Receita de 5.000 consultoria maio\n\n".
-                'Envie /help para mais exemplos.',
+                "Não entendi. Envie:\n".
+                "• Foto/PDF/XML de comprovante ou nota fiscal (confirmamos antes de salvar)\n".
+                "• Texto: Gasto de 16.000 descrição\n".
+                "• /help",
                 $token
             );
 
             return ['handled' => true, 'reply' => 'unparsed'];
-        }
-
-        $workspaceId = (int) $user->workspaces()->value('workspaces.id');
-        if ($workspaceId < 1) {
-            $this->telegram->send($chatId, 'Sua conta não tem workspace ativo.', $token);
-
-            return ['handled' => true, 'reply' => 'no_workspace'];
         }
 
         $date = now()->toDateString();
@@ -102,7 +204,7 @@ class TelegramInboundService
             $intent['description'],
             $fingerprint,
         )) {
-            $this->telegram->send(
+            $this->reply(
                 $chatId,
                 'ℹ️ Esse lançamento já parece existir na base (mesmo valor, data e descrição). Nada foi duplicado.',
                 $token
@@ -130,7 +232,7 @@ class TelegramInboundService
         $label = $intent['type'] === TransactionType::Income ? 'Receita' : 'Gasto';
         $amountFormatted = 'R$ '.number_format($intent['amount'], 2, ',', '.');
 
-        $this->telegram->send(
+        $this->reply(
             $chatId,
             "✅ {$label} registrado (#{$transaction->id})\n".
             "Valor: {$amountFormatted}\n".
@@ -151,8 +253,42 @@ class TelegramInboundService
     protected function resolveUserByChatId(string $chatId): ?User
     {
         return User::query()
-            ->where('preferences->notifications->telegram_chat_id', $chatId)
+            ->where(function ($q) use ($chatId) {
+                $q->where('preferences->notifications->telegram_chat_id', $chatId)
+                    ->orWhere('preferences->notifications->telegram_chat_id', '"'.$chatId.'"');
+            })
             ->first();
+    }
+
+    protected function hasInboundDocument(array $message): bool
+    {
+        return $this->extractInboundFileId($message) !== null;
+    }
+
+    protected function extractInboundFileId(array $message): ?string
+    {
+        if (! empty($message['photo']) && is_array($message['photo'])) {
+            $largest = end($message['photo']);
+
+            return $largest['file_id'] ?? null;
+        }
+
+        $document = $message['document'] ?? null;
+        if (is_array($document)) {
+            $mime = strtolower((string) ($document['mime_type'] ?? ''));
+            $fileName = strtolower((string) ($document['file_name'] ?? ''));
+            if (str_starts_with($mime, 'image/')
+                || $mime === 'application/pdf'
+                || str_contains($mime, 'xml')
+                || str_ends_with($fileName, '.pdf')
+                || str_ends_with($fileName, '.xml')
+                || $mime === ''
+                || $mime === 'application/octet-stream') {
+                return $document['file_id'] ?? null;
+            }
+        }
+
+        return null;
     }
 
     protected function isCommand(string $text, string $command): bool
@@ -160,16 +296,26 @@ class TelegramInboundService
         return str_starts_with(mb_strtolower(trim($text)), $command);
     }
 
+    protected function extractRunAlias(string $text): string
+    {
+        $parts = preg_split('/\s+/', mb_strtolower(trim($text)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return $parts[1] ?? '';
+    }
+
+    protected function reply(string $chatId, string $message, string $token): void
+    {
+        $result = $this->telegram->send($chatId, $message, $token);
+        if (! ($result['ok'] ?? false)) {
+            Log::error('Telegram reply failed', [
+                'chat_id' => $chatId,
+                'error' => $result['error'] ?? 'unknown',
+            ]);
+        }
+    }
+
     protected function helpMessage(): string
     {
-        return "Olá! Sou o assistente financeiro.\n\n".
-            "Envie lançamentos em texto livre, por exemplo:\n".
-            "• Gasto de 16.000 aporte sociedade Multfilmes GYN\n".
-            "• Despesa 250,50 almoço equipe\n".
-            "• Receita de 5.000 consultoria\n\n".
-            "Requisitos:\n".
-            "1. Conta vinculada em /integrations/notifications\n".
-            "2. Valor com centavos opcional (16.000 ou 250,50)\n\n".
-            'Duplicatas (mesmo dia, valor e descrição) são ignoradas.';
+        return $this->operationsGuide->helpIntro();
     }
 }

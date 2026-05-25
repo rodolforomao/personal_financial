@@ -5,19 +5,22 @@ namespace Modules\Finance\Application\Services;
 use App\Core\Enums\TransactionStatus;
 use App\Core\Enums\TransactionType;
 use Illuminate\Support\Carbon;
+use Modules\Finance\Application\DTOs\DashboardFilter;
 use Modules\Finance\Infrastructure\Models\CashFlowSnapshot;
 use Modules\Finance\Infrastructure\Models\Transaction;
 
 class CashFlowService
 {
-    public function snapshot(int $workspaceId, ?Carbon $date = null): CashFlowSnapshot
+    public function snapshot(int $workspaceId, ?Carbon $date = null, ?DashboardFilter $filter = null): CashFlowSnapshot
     {
         $date ??= now();
         $start = $date->copy()->startOfMonth();
         $end = $date->copy()->endOfMonth();
+        $filter ??= DashboardFilter::consolidated();
 
         $transactions = Transaction::query()
             ->where('workspace_id', $workspaceId)
+            ->forDashboard($filter)
             ->where('status', TransactionStatus::Confirmed)
             ->whereBetween('transaction_date', [$start, $end])
             ->get();
@@ -40,10 +43,11 @@ class CashFlowService
         );
     }
 
-    public function dashboard(int $workspaceId): array
+    public function dashboard(int $workspaceId, ?DashboardFilter $filter = null): array
     {
-        $current = $this->snapshot($workspaceId);
-        $previous = $this->snapshot($workspaceId, now()->subMonth());
+        $filter ??= DashboardFilter::consolidated();
+        $current = $this->snapshot($workspaceId, null, $filter);
+        $previous = $this->snapshot($workspaceId, now()->subMonth(), $filter);
 
         return [
             'current_month' => $current,

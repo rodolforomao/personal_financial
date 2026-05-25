@@ -1,0 +1,63 @@
+OFXHEADER:100
+DATA:OFXSGML
+VERSION:102
+<ORG>Banco Inter
+<BANKID>077
+<OFX>
+<BANKMSGSRSV1>
+<STMTTRNRS>
+<STMTRS>
+<BANKTRANLIST>
+<STMTTRN>
+<TRNTYPE>DEBIT
+<DTPOSTED>20260510000000
+<TRNAMT>-43.97
+<FITID>inter-uber-001
+<NAME>Uber Uber *trip Help.u Sp Bra
+<MEMO>Compra no debito: "No estabelecimento Uber UBER *TRIP HELP.U SP BRA"
+</STMTTRN>
+<STMTTRN>
+<TRNTYPE>DEBIT
+<DTPOSTED>20260510000000
+<TRNAMT>-26.94
+<FITID>inter-uber-pair-exp
+<NAME>Uber Uber *trip Help.u Sp Bra
+<MEMO>Compra no debito: "No estabelecimento Uber UBER *TRIP HELP.U SP BRA"
+</STMTTRN>
+<STMTTRN>
+<TRNTYPE>CREDIT
+<DTPOSTED>20260510000000
+<TRNAMT>26.94
+<FITID>inter-uber-pair-ref
+<NAME>Compra cartão
+<MEMO>Estorno: "Estorno no estabelecimento nao informado"
+</STMTTRN>
+<STMTTRN>
+<TRNTYPE>CREDIT
+<DTPOSTED>20260510000000
+<TRNAMT>31.93
+<FITID>inter-estorno-dup-a
+<NAME>Compra cartão
+<MEMO>Estorno: "Estorno no estabelecimento nao informado"
+</STMTTRN>
+<STMTTRN>
+<TRNTYPE>CREDIT
+<DTPOSTED>20260510000000
+<TRNAMT>31.98
+<FITID>inter-estorno-dup-b
+<NAME>Compra cartão
+<MEMO>Estorno: "Estorno no estabelecimento nao informado"
+</STMTTRN>
+<STMTTRN>
+<TRNTYPE>DEBIT
+<DTPOSTED>20260508000000
+<TRNAMT>-150.00
+<FITID>inter-pix-001
+<NAME>Rafael Silva Oliveira
+<MEMO>Pix enviado: "Cp :18236120-Rafael Silva Oliveira"
+</STMTTRN>
+</BANKTRANLIST>
+</STMTRS>
+</STMTTRNRS>
+</BANKMSGSRSV1>
+</OFX>

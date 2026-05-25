@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Modules\Core\Infrastructure\Models\Workspace;
+use Modules\Integrations\Application\Jobs\ProcessEvolutionInboundJob;
 use Modules\Integrations\Application\Jobs\ProcessTelegramUpdateJob;
 use Modules\Integrations\Infrastructure\Models\IntegrationConnection;
 use Modules\Integrations\Infrastructure\Models\WebhookLog;
@@ -21,7 +23,7 @@ class WebhookController extends Controller
         $payload = $request->all();
 
         WebhookLog::query()->create([
-            'workspace_id' => config('financial.integrations.evolution.status_workspace_id'),
+            'workspace_id' => $this->webhookLogWorkspaceId(),
             'provider' => 'telegram',
             'event' => $this->telegramEventName($payload),
             'payload' => $payload,
@@ -30,7 +32,11 @@ class WebhookController extends Controller
 
         if (isset($payload['message']) || isset($payload['edited_message'])) {
             if (config('financial.integrations.telegram.inbound_enabled', true)) {
-                ProcessTelegramUpdateJob::dispatch($payload);
+                if (config('financial.integrations.telegram.inbound_sync', true)) {
+                    ProcessTelegramUpdateJob::dispatchSync($payload);
+                } else {
+                    ProcessTelegramUpdateJob::dispatch($payload);
+                }
             }
         }
 
@@ -49,7 +55,7 @@ class WebhookController extends Controller
         $payload = $request->all();
 
         WebhookLog::query()->create([
-            'workspace_id' => config('financial.integrations.evolution.status_workspace_id'),
+            'workspace_id' => $this->webhookLogWorkspaceId(),
             'provider' => 'evolution_whatsapp',
             'event' => $event,
             'payload' => $payload,
@@ -58,7 +64,23 @@ class WebhookController extends Controller
 
         $this->syncEvolutionConnectionStatus($event, $payload);
 
+        if ($this->isEvolutionMessageEvent($event) && config('financial.integrations.whatsapp.inbound_enabled', true)) {
+            if (config('financial.integrations.whatsapp.inbound_sync', true)) {
+                ProcessEvolutionInboundJob::dispatchSync($payload);
+            } else {
+                ProcessEvolutionInboundJob::dispatch($payload);
+            }
+        }
+
         return response()->json(['ok' => true]);
+    }
+
+    protected function isEvolutionMessageEvent(string $event): bool
+    {
+        $normalized = str_replace(['.', '-'], '_', strtolower($event));
+
+        // Apenas mensagens recebidas; send.message é eco do que o bot enviou.
+        return str_contains($normalized, 'messages_upsert');
     }
 
     protected function verifyTelegramWebhook(Request $request): bool
@@ -97,9 +119,22 @@ class WebhookController extends Controller
 
         $provided = $request->header('apikey')
             ?? $request->header('x-api-key')
-            ?? $request->query('apikey');
+            ?? $request->query('apikey')
+            ?? $request->input('apikey');
 
         return is_string($provided) && hash_equals((string) $expected, $provided);
+    }
+
+    protected function webhookLogWorkspaceId(): ?int
+    {
+        $configured = (int) config('financial.integrations.evolution.status_workspace_id');
+        if ($configured > 0 && Workspace::query()->whereKey($configured)->exists()) {
+            return $configured;
+        }
+
+        $first = Workspace::query()->orderBy('id')->value('id');
+
+        return is_numeric($first) ? (int) $first : null;
     }
 
     protected function syncEvolutionConnectionStatus(string $event, array $payload): void
@@ -115,8 +150,8 @@ class WebhookController extends Controller
             ?? 'unknown'
         ));
 
-        $workspaceId = (int) config('financial.integrations.evolution.status_workspace_id');
-        if ($workspaceId < 1) {
+        $workspaceId = $this->webhookLogWorkspaceId();
+        if ($workspaceId === null || $workspaceId < 1) {
             return;
         }
 

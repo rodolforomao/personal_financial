@@ -1,3 +1,6 @@
+@php
+    $menuItems = $sidebarMenu ?? config('adminlte.menu', []);
+@endphp
 <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
     <div class="sidebar-brand">
         <a href="{{ route('dashboard') }}" class="brand-link">
@@ -7,7 +10,7 @@
     <div class="sidebar-wrapper">
         <nav class="mt-2">
             <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="navigation" data-accordion="false">
-                @foreach(config('adminlte.menu') as $item)
+                @foreach($menuItems as $item)
                     @if(!empty($item['role']) && !auth()->user()?->hasRole($item['role']))
                         @continue
                     @endif

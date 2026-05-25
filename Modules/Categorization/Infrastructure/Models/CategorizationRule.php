@@ -9,8 +9,8 @@ use Modules\Core\Infrastructure\Models\Workspace;
 class CategorizationRule extends Model
 {
     protected $fillable = [
-        'workspace_id', 'category_id', 'match_type', 'pattern',
-        'priority', 'is_active', 'hit_count',
+        'workspace_id', 'category_id', 'name', 'match_type', 'pattern',
+        'transaction_type', 'priority', 'is_active', 'hit_count',
     ];
 
     protected function casts(): array

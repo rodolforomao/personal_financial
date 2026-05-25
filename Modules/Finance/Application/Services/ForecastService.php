@@ -4,14 +4,16 @@ namespace Modules\Finance\Application\Services;
 
 use App\Core\Enums\TransactionType;
 use Illuminate\Support\Carbon;
+use Modules\Finance\Application\DTOs\DashboardFilter;
 use Modules\Finance\Infrastructure\Models\FinancialForecast;
 use Modules\Finance\Infrastructure\Models\RecurringItem;
 use Modules\Finance\Infrastructure\Models\Transaction;
 
 class ForecastService
 {
-    public function generate(int $workspaceId, int $horizonDays = 90): FinancialForecast
+    public function generate(int $workspaceId, int $horizonDays = 90, ?DashboardFilter $filter = null): FinancialForecast
     {
+        $filter ??= DashboardFilter::consolidated();
         $start = now();
         $end = now()->addDays($horizonDays);
 
@@ -29,6 +31,7 @@ class ForecastService
 
         $pendingIncome = Transaction::query()
             ->where('workspace_id', $workspaceId)
+            ->forDashboard($filter)
             ->where('type', TransactionType::Income)
             ->where('status', 'pending')
             ->whereBetween('due_date', [$start, $end])
@@ -36,6 +39,7 @@ class ForecastService
 
         $pendingExpense = Transaction::query()
             ->where('workspace_id', $workspaceId)
+            ->forDashboard($filter)
             ->where('type', TransactionType::Expense)
             ->where('status', 'pending')
             ->whereBetween('due_date', [$start, $end])

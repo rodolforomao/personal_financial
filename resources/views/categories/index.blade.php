@@ -69,8 +69,9 @@
             </div>
         </div>
         <p class="text-muted small mt-2">
-            A categorização automática usa regras (ex.: OpenAI → IA) e IA quando habilitada.
-            Ao criar transações, deixe a categoria em branco para sugerir automaticamente.
+            <a href="{{ route('categorization-rules.index') }}">Regras de auto categorização</a>
+            (Uber → Transporte, Evento B3 → Dividendos, etc.) e IA quando habilitada.
+            Deixe a categoria em branco ao lançar para aplicar automaticamente.
         </p>
     </div>
 </div>

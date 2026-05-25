@@ -2,6 +2,7 @@
 
 namespace Modules\Categorization\Application\Services;
 
+use App\Core\Enums\TransactionType;
 use App\Core\Support\FeatureFlag;
 use Illuminate\Support\Str;
 use Modules\Categorization\Infrastructure\Models\Category;
@@ -14,16 +15,21 @@ class CategorizationService
         protected ?FinancialIntelligenceService $intelligence = null,
     ) {}
 
-    public function suggest(int $workspaceId, string $description, ?string $counterparty = null): ?array
-    {
+    public function suggest(
+        int $workspaceId,
+        string $description,
+        ?string $counterparty = null,
+        ?TransactionType $transactionType = null,
+    ): ?array {
         $haystack = Str::lower(trim("{$description} {$counterparty}"));
 
         $rule = CategorizationRule::query()
             ->where('workspace_id', $workspaceId)
             ->where('is_active', true)
             ->orderBy('priority')
+            ->orderBy('id')
             ->get()
-            ->first(fn (CategorizationRule $r) => $this->matches($r, $haystack));
+            ->first(fn (CategorizationRule $r) => $this->matchesRule($r, $haystack, $transactionType));
 
         if ($rule) {
             $rule->increment('hit_count');
@@ -75,7 +81,18 @@ class CategorizationService
         ];
     }
 
-    protected function matches(CategorizationRule $rule, string $haystack): bool
+    protected function matchesRule(CategorizationRule $rule, string $haystack, ?TransactionType $transactionType): bool
+    {
+        if ($rule->transaction_type !== null && $transactionType !== null) {
+            if ($rule->transaction_type !== $transactionType->value) {
+                return false;
+            }
+        }
+
+        return $this->matchesPattern($rule, $haystack);
+    }
+
+    protected function matchesPattern(CategorizationRule $rule, string $haystack): bool
     {
         $pattern = Str::lower($rule->pattern);
 

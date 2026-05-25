@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Modules\Alerts\Application\Services\AlertDetectionService;
 use Modules\Core\Infrastructure\Models\Workspace;
 use Modules\Finance\Application\Services\CashFlowService;
+use Modules\Finance\Application\Services\CltSalaryService;
 use Modules\Finance\Application\Services\ForecastService;
 use Modules\Intelligence\Application\Jobs\RunFinancialAnalysisJob;
 use Modules\Intelligence\Application\Jobs\RunObservabilityAnalysisJob;
@@ -20,6 +21,7 @@ class FinancialDailyIntelligenceCommand extends Command
         AlertDetectionService $alerts,
         CashFlowService $cashFlow,
         ForecastService $forecast,
+        CltSalaryService $cltSalaries,
     ): int {
         $query = Workspace::query()->where('is_active', true);
 
@@ -33,6 +35,10 @@ class FinancialDailyIntelligenceCommand extends Command
             $this->info("Workspace #{$workspace->id} — {$workspace->name}");
 
             $alerts->scan($workspace->id);
+            $opened = $cltSalaries->ensurePendingPeriods($workspace->id);
+            if ($opened > 0) {
+                $this->line("  CLT: {$opened} confirmação(ões) mensal(is) aberta(s).");
+            }
             $cashFlow->snapshot($workspace->id);
             $forecast->generate($workspace->id);
             RunFinancialAnalysisJob::dispatch($workspace->id)->onQueue('ai');

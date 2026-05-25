@@ -5,6 +5,7 @@ namespace Modules\OCR\Application\Services\Providers;
 use App\Core\Contracts\OcrProviderInterface;
 use App\Core\DTOs\OcrRequestData;
 use App\Core\DTOs\OcrResultData;
+use App\Core\Support\MarkdownJsonParser;
 use Illuminate\Support\Facades\Http;
 
 class VisionApiOcrProvider implements OcrProviderInterface
@@ -25,26 +26,50 @@ class VisionApiOcrProvider implements OcrProviderInterface
                 'messages' => [[
                     'role' => 'user',
                     'content' => [
-                        ['type' => 'text', 'text' => 'Extract financial data from this document. Return JSON: amount, date, counterparty, bank, suggested_category, raw_text'],
+                        ['type' => 'text', 'text' => $this->prompt()],
                         ['type' => 'image_url', 'image_url' => ['url' => "data:{$request->mimeType};base64,{$base64}"]],
                     ],
                 ]],
+                'temperature' => 0.1,
             ])
             ->throw()
             ->json();
 
         $content = $response['choices'][0]['message']['content'] ?? '{}';
-        $parsed = json_decode($content, true) ?? [];
+        $parsed = MarkdownJsonParser::decode($content);
+
+        $amount = isset($parsed['amount']) ? (float) $parsed['amount'] : null;
 
         return new OcrResultData(
             rawText: $parsed['raw_text'] ?? $content,
             entities: $parsed,
-            amount: $parsed['amount'] ?? null,
+            amount: $amount,
             date: $parsed['date'] ?? null,
             counterparty: $parsed['counterparty'] ?? null,
             bank: $parsed['bank'] ?? null,
             suggestedCategory: $parsed['suggested_category'] ?? null,
-            confidence: 90.0,
+            confidence: 92.0,
         );
+    }
+
+    protected function prompt(): string
+    {
+        return <<<'PROMPT'
+Analise comprovantes financeiros brasileiros (PIX, TED, boleto, Nubank, Inter, Itaú).
+
+Retorne APENAS um JSON válido (sem markdown), com:
+- transfer_direction: "received" se o titular do comprovante RECEBEU o valor (aparece em Destino / "você recebeu" / crédito); "sent" se ENVIOU (Origem / "Pix enviado" / "você enviou" / débito)
+- type: "income" se transfer_direction=received; "expense" se transfer_direction=sent
+- amount: número em reais com ponto decimal (ex.: 4000.00 para R$ 4.000,00)
+- date: YYYY-MM-DD
+- description: texto curto do comprovante (ex.: "Pix recebido", "Pix enviado")
+- counterparty: nome da OUTRA parte (quem enviou se você recebeu; quem recebeu se você enviou) — nunca repita o titular do comprovante
+- bank: instituição do comprovante (ex.: "Nubank")
+- receipt_type: pix_received, pix_sent, boleto, transfer, card, bank_receipt
+- suggested_category: slug em minúsculas
+- raw_text: linhas legíveis incluindo Destino e Origem quando existirem
+
+Em comprovantes Nubank/Inter com blocos Destino e Origem: quem está em Destino recebeu o Pix (transfer_direction=received).
+PROMPT;
     }
 }

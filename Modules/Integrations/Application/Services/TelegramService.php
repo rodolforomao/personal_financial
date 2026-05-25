@@ -2,6 +2,8 @@
 
 namespace Modules\Integrations\Application\Services;
 
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -18,7 +20,7 @@ class TelegramService
             return ['ok' => false, 'error' => 'Token do bot não configurado no servidor (.env TELEGRAM_BOT_TOKEN).'];
         }
 
-        $response = Http::timeout(15)
+        $response = Http::external()->timeout(15)
             ->post("https://api.telegram.org/bot{$token}/sendMessage", [
                 'chat_id' => $chatId,
                 'text' => $message,
@@ -85,7 +87,7 @@ class TelegramService
         $chatRef = str_starts_with($destination, '@') ? $destination : '@'.$destination;
 
         try {
-            $chat = Http::timeout(10)
+            $chat = Http::external()->timeout(10)
                 ->get("https://api.telegram.org/bot{$botToken}/getChat", ['chat_id' => $chatRef]);
 
             if ($chat->successful()) {
@@ -98,7 +100,7 @@ class TelegramService
         }
 
         $username = Str::lower(ltrim($chatRef, '@'));
-        $updates = Http::timeout(10)->get("https://api.telegram.org/bot{$botToken}/getUpdates");
+        $updates = Http::external()->timeout(10)->get("https://api.telegram.org/bot{$botToken}/getUpdates");
 
         if (! $updates->successful()) {
             return null;
@@ -142,6 +144,135 @@ class TelegramService
         }
 
         return null;
+    }
+
+    /**
+     * @return array{ok: bool, path?: string, mime?: string, error?: string}
+     */
+    public function downloadFile(string $fileId, ?string $botToken = null): array
+    {
+        $token = $botToken ?? config('financial.integrations.telegram.bot_token');
+        if (! $token) {
+            return ['ok' => false, 'error' => 'Token do bot não configurado.'];
+        }
+
+        try {
+            $meta = $this->telegramGet($token, 'getFile', ['file_id' => $fileId], timeout: 15);
+        } catch (ConnectionException $e) {
+            return ['ok' => false, 'error' => $this->downloadConnectionError($e)];
+        }
+
+        if ($meta->failed()) {
+            return ['ok' => false, 'error' => 'Arquivo não encontrado no Telegram.'];
+        }
+
+        $filePath = $meta->json('result.file_path');
+        if (! is_string($filePath) || $filePath === '') {
+            return ['ok' => false, 'error' => 'Caminho do arquivo inválido.'];
+        }
+
+        $url = "https://api.telegram.org/file/bot{$token}/{$filePath}";
+
+        try {
+            $binary = $this->telegramGet($url, null, [], timeout: 60, isAbsoluteUrl: true);
+        } catch (ConnectionException $e) {
+            Log::warning('Telegram file download failed', [
+                'file_id' => $fileId,
+                'file_path' => $filePath,
+                'message' => $e->getMessage(),
+            ]);
+
+            return ['ok' => false, 'error' => $this->downloadConnectionError($e)];
+        }
+
+        if ($binary->failed()) {
+            return ['ok' => false, 'error' => 'Falha ao baixar arquivo do Telegram.'];
+        }
+
+        $body = $binary->body();
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION) ?: '');
+        if ($ext === '') {
+            $ext = $this->guessExtensionFromContent($body);
+        }
+        $tmp = sys_get_temp_dir().'/tg_'.uniqid().'.'.$ext;
+        file_put_contents($tmp, $body);
+
+        $mime = match (strtolower($ext)) {
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            'pdf' => 'application/pdf',
+            'xml' => 'application/xml',
+            default => 'image/jpeg',
+        };
+
+        return ['ok' => true, 'path' => $tmp, 'mime' => $mime];
+    }
+
+    protected function guessExtensionFromContent(string $body): string
+    {
+        $prefix = ltrim(substr($body, 0, 120));
+
+        if (str_starts_with($prefix, '%PDF')) {
+            return 'pdf';
+        }
+
+        if (str_starts_with($prefix, '<?xml') || str_contains($prefix, '<nfeProc')) {
+            return 'xml';
+        }
+
+        return 'jpg';
+    }
+
+    /**
+     * GET com retentativas para falhas transitórias (reset de conexão, timeout).
+     *
+     * @param  array<string, mixed>  $query
+     */
+    protected function telegramGet(
+        string $tokenOrUrl,
+        ?string $method,
+        array $query = [],
+        int $timeout = 30,
+        bool $isAbsoluteUrl = false,
+    ): \Illuminate\Http\Client\Response {
+        $url = $isAbsoluteUrl
+            ? $tokenOrUrl
+            : "https://api.telegram.org/bot{$tokenOrUrl}/{$method}";
+
+        $attempts = max(1, (int) config('financial.integrations.telegram.download_retries', 3));
+        $delayMs = max(100, (int) config('financial.integrations.telegram.download_retry_delay_ms', 800));
+
+        return Http::external()
+            ->timeout($timeout)
+            ->retry(
+                $attempts,
+                $delayMs,
+                function (\Throwable $exception): bool {
+                    if ($exception instanceof ConnectionException) {
+                        return true;
+                    }
+
+                    return $exception instanceof RequestException
+                        && $exception->response !== null
+                        && $exception->response->serverError();
+                },
+                throw: true,
+            )
+            ->get($url, $query);
+    }
+
+    protected function downloadConnectionError(ConnectionException $e): string
+    {
+        $msg = $e->getMessage();
+        if (str_contains($msg, 'Connection reset') || str_contains($msg, 'cURL error 35')) {
+            return 'Conexão com o Telegram caiu ao baixar a imagem. Tente reenviar a foto em alguns segundos.';
+        }
+
+        if (str_contains($msg, 'timed out') || str_contains($msg, 'cURL error 28')) {
+            return 'Download do Telegram demorou demais. Reenvie a foto ou use uma imagem menor.';
+        }
+
+        return 'Não foi possível baixar o arquivo do Telegram agora. Reenvie a foto em instantes.';
     }
 
     protected function friendlyError(string $description, string $chatId): string

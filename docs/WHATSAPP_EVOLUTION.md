@@ -60,7 +60,24 @@ php artisan config:clear
 php artisan evolution:webhook-sync
 ```
 
-O comando registra `APP_URL/api/v1/webhooks/whatsapp` na Evolution.
+O comando registra o webhook na Evolution. Se o Laravel roda no host e o Evolution no Docker, use:
+
+```env
+EVOLUTION_WEBHOOK_PUBLIC_URL=http://host.docker.internal:8000/api/v1/webhooks/whatsapp
+```
+
+(`localhost` no `APP_URL` **não** funciona dentro do container.)
+
+Diagnóstico: `php artisan evolution:diagnose`
+
+Laravel no host + Evolution no Docker:
+
+```bash
+php artisan serve --host=0.0.0.0 --port=8000
+php artisan evolution:webhook-sync
+```
+
+Sem `--host=0.0.0.0`, o `serve` só escuta `127.0.0.1` e o container não consegue POST no webhook.
 
 ## 4. Usuário final
 
@@ -68,6 +85,19 @@ O comando registra `APP_URL/api/v1/webhooks/whatsapp` na Evolution.
 2. Informar número com DDI (ex.: `+55 11 99999-9999`).
 3. Escolher **API do sistema**.
 4. Marcar **Receber alertas por WhatsApp** → **Salvar** → **Testar WhatsApp**.
+
+### Comprovantes (foto / PDF)
+
+**WhatsApp Business / `@lid`:** algumas mensagens chegam com `remoteJid` terminando em `@lid` (identificador interno), sem o número real. O sistema usa `remoteJidAlt` quando existir; se houver **apenas um** usuário com WhatsApp em Integrações, associa automaticamente a esse número.
+
+
+1. Envie **foto ou PDF** do comprovante no WhatsApp (com a instância **open**)
+2. O bot responde com tipo, valor, data e descrição (OCR)
+3. Responda **SIM** para salvar (transação + comprovante anexado) ou **NÃO** para descartar
+
+Requisitos: `WHATSAPP_INBOUND_ENABLED=true`, `php artisan evolution:webhook-sync` (base64 ativo por padrão). Com `WHATSAPP_INBOUND_SYNC=true` (padrão) não precisa de `queue:work` para comprovantes.
+
+Mesmo fluxo no Telegram: `docs/TELEGRAM_INBOUND.md`.
 
 ## 5. Testar webhook
 
