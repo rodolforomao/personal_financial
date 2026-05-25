@@ -214,6 +214,8 @@ DB_PASS=$(RUN "grep DB_PASSWORD= '$REMOTE_DIR/.deploy-secrets' 2>/dev/null | cut
 EVO_PASS=$(RUN "grep EVOLUTION_DB_PASSWORD= '$REMOTE_DIR/.deploy-secrets' 2>/dev/null | cut -d= -f2" || true)
 ENV_TMP=$(mktemp)
 SEEN_DB_PASSWORD=false
+SEEN_CURL_CA_BUNDLE=false
+SEEN_HTTP_FORCE_IPV4=false
 SEEN_EVO_DATABASE=false
 SEEN_EVO_USERNAME=false
 SEEN_EVO_PASSWORD=false
@@ -231,6 +233,14 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     DB_PASSWORD)
       SEEN_DB_PASSWORD=true
       echo "DB_PASSWORD=${DB_PASS:-${line#*=}}"
+      ;;
+    CURL_CA_BUNDLE)
+      SEEN_CURL_CA_BUNDLE=true
+      echo "CURL_CA_BUNDLE=$REMOTE_DIR/storage/app/ca-certificates.crt"
+      ;;
+    HTTP_FORCE_IPV4)
+      SEEN_HTTP_FORCE_IPV4=true
+      echo "HTTP_FORCE_IPV4=true"
       ;;
     EVOLUTION_DB_DATABASE)
       SEEN_EVO_DATABASE=true
@@ -252,6 +262,12 @@ done < "$ENV_FILE" > "$ENV_TMP"
 if [[ "$SEEN_DB_PASSWORD" == false && -n "${DB_PASS:-}" ]]; then
   echo "DB_PASSWORD=$DB_PASS" >> "$ENV_TMP"
 fi
+if [[ "$SEEN_CURL_CA_BUNDLE" == false ]]; then
+  echo "CURL_CA_BUNDLE=$REMOTE_DIR/storage/app/ca-certificates.crt" >> "$ENV_TMP"
+fi
+if [[ "$SEEN_HTTP_FORCE_IPV4" == false ]]; then
+  echo "HTTP_FORCE_IPV4=true" >> "$ENV_TMP"
+fi
 if [[ "$SEEN_EVO_DATABASE" == false ]]; then
   echo "EVOLUTION_DB_DATABASE=${DEPLOY_WEB_USER}_evolution" >> "$ENV_TMP"
 fi
@@ -263,7 +279,7 @@ if [[ "$SEEN_EVO_PASSWORD" == false && -n "${EVO_PASS:-}" ]]; then
 fi
 rsync -avz -e "$RSYNC_RSH" "$ENV_TMP" "$SSH_USER@$SSH_HOST:$REMOTE_DIR/.env"
 rm -f "$ENV_TMP"
-RUN "chown '$DEPLOY_WEB_USER:$DEPLOY_WEB_USER' '$REMOTE_DIR/.env' && chmod 600 '$REMOTE_DIR/.env'"
+RUN "set -e; mkdir -p '$REMOTE_DIR/storage/app'; if [[ -f /etc/ssl/certs/ca-certificates.crt ]]; then cp /etc/ssl/certs/ca-certificates.crt '$REMOTE_DIR/storage/app/ca-certificates.crt'; chown '$DEPLOY_WEB_USER:$DEPLOY_WEB_USER' '$REMOTE_DIR/storage/app/ca-certificates.crt'; chmod 644 '$REMOTE_DIR/storage/app/ca-certificates.crt'; fi; chown '$DEPLOY_WEB_USER:$DEPLOY_WEB_USER' '$REMOTE_DIR/.env' && chmod 600 '$REMOTE_DIR/.env'"
 
 echo "==> Fase 5: composer e limpeza de caches"
 RUN "REMOTE_DIR='$REMOTE_DIR' DEPLOY_PHP_BIN='$DEPLOY_PHP_BIN' DEPLOY_WEB_USER='$DEPLOY_WEB_USER' bash -s" <<'REMOTE_COMPOSER'

@@ -23,4 +23,12 @@ class HttpClientOptionsTest extends TestCase
             $this->assertSame(CURL_IPRESOLVE_V4, $options['curl'][CURLOPT_IPRESOLVE] ?? null);
         }
     }
+
+    public function test_external_http_client_can_detect_paths_outside_open_basedir(): void
+    {
+        $method = new \ReflectionMethod(HttpClientOptions::class, 'isWithinOpenBaseDir');
+
+        $this->assertFalse($method->invoke(null, '/etc/ssl/certs/ca-certificates.crt', base_path().PATH_SEPARATOR.sys_get_temp_dir()));
+        $this->assertTrue($method->invoke(null, base_path('storage/test-ca.pem'), base_path().PATH_SEPARATOR.sys_get_temp_dir()));
+    }
 }

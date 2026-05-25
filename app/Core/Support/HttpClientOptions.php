@@ -18,7 +18,7 @@ class HttpClientOptions
             $options['verify'] = false;
         } else {
             $bundle = config('financial.http.ca_bundle');
-            if (is_string($bundle) && $bundle !== '' && is_file($bundle)) {
+            if (is_string($bundle) && $bundle !== '' && self::isAllowedFile($bundle)) {
                 $options['verify'] = $bundle;
             } else {
                 foreach ([
@@ -27,7 +27,7 @@ class HttpClientOptions
                     '/etc/ssl/cert.pem',
                     '/usr/local/etc/openssl/cert.pem',
                 ] as $path) {
-                    if (is_file($path)) {
+                    if (self::isAllowedFile($path)) {
                         $options['verify'] = $path;
                         break;
                     }
@@ -42,5 +42,32 @@ class HttpClientOptions
         }
 
         return $options;
+    }
+
+    protected static function isAllowedFile(string $path): bool
+    {
+        $openBaseDir = ini_get('open_basedir');
+        if (is_string($openBaseDir) && $openBaseDir !== '' && ! self::isWithinOpenBaseDir($path, $openBaseDir)) {
+            return false;
+        }
+
+        return is_file($path);
+    }
+
+    protected static function isWithinOpenBaseDir(string $path, string $openBaseDir): bool
+    {
+        $normalized = rtrim(str_replace('\\', '/', $path), '/');
+        foreach (explode(PATH_SEPARATOR, $openBaseDir) as $allowed) {
+            $allowed = rtrim(str_replace('\\', '/', $allowed), '/');
+            if ($allowed === '') {
+                continue;
+            }
+
+            if ($normalized === $allowed || str_starts_with($normalized, $allowed.'/')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
