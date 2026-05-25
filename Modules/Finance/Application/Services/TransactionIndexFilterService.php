@@ -27,6 +27,7 @@ class TransactionIndexFilterService
         'funding_source',
         'payment_method',
         'source',
+        'statement_import_id',
         'amount_min',
         'amount_max',
         'missing',
@@ -99,6 +100,13 @@ class TransactionIndexFilterService
 
         if ($request->filled('source')) {
             $query->where('source', (string) $request->input('source'));
+        }
+
+        if ($request->filled('statement_import_id')) {
+            $importId = $request->integer('statement_import_id');
+            if ($importId > 0) {
+                $query->where('metadata->statement_import_id', $importId);
+            }
         }
 
         if ($request->filled('amount_min')) {

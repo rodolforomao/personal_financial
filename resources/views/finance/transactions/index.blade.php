@@ -35,6 +35,13 @@
 </div>
 @endif
 
+@if(request('statement_import_id'))
+<div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <span>Mostrando transações criadas pela importação de extrato #{{ request('statement_import_id') }}. Selecione as linhas para alterar propriedades em massa.</span>
+    <a href="{{ route('statements.reconcile', request('statement_import_id')) }}" class="btn btn-outline-primary btn-sm">Ver conciliação</a>
+</div>
+@endif
+
 <div class="card mb-3">
     <div class="card-header py-2 d-flex justify-content-between align-items-center">
         <h3 class="card-title mb-0 small"><i class="bi bi-funnel"></i> Filtros</h3>
@@ -44,6 +51,9 @@
     </div>
     <div class="card-body py-2">
         <form method="GET" id="tx-filter-form">
+            @if(request('statement_import_id'))
+                <input type="hidden" name="statement_import_id" value="{{ request('statement_import_id') }}">
+            @endif
             <div class="row g-2 align-items-end">
                 <div class="col-md-4 col-lg-3">
                     <label class="form-label small mb-0">Descrição contém</label>

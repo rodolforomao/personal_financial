@@ -92,4 +92,32 @@ class TransactionIndexFilterTest extends TestCase
 
         $this->assertEquals(1, $query->count());
     }
+
+    public function test_statement_import_filter(): void
+    {
+        app(CreateTransactionAction::class)->execute(new CreateTransactionData(
+            workspaceId: $this->workspace->id,
+            type: TransactionType::Expense,
+            amount: 10,
+            description: 'Importado A',
+            transactionDate: now()->toDateString(),
+            metadata: ['statement_import_id' => 123],
+        ));
+
+        app(CreateTransactionAction::class)->execute(new CreateTransactionData(
+            workspaceId: $this->workspace->id,
+            type: TransactionType::Expense,
+            amount: 20,
+            description: 'Importado B',
+            transactionDate: now()->toDateString(),
+            metadata: ['statement_import_id' => 456],
+        ));
+
+        $request = Request::create('/', 'GET', ['statement_import_id' => '123']);
+        $query = Transaction::query()->where('workspace_id', $this->workspace->id);
+        app(TransactionIndexFilterService::class)->apply($query, $request);
+
+        $this->assertEquals(1, $query->count());
+        $this->assertSame('Importado A', $query->first()->description);
+    }
 }
