@@ -51,14 +51,11 @@ class TelegramInboundService
         $user = $this->resolveUserForInboundMessage($message, $chatId);
 
         if ($text !== '' && ($this->isCommand($text, '/start') || $this->isCommand($text, '/help'))) {
-            $this->reply(
-                $chatId,
-                $user
-                    ? $this->helpMessage()
-                    : "Não encontrei sua conta. Configure Telegram em:\n".config('app.url')."/integrations/notifications\n".
-                        'e envie /start ao bot @'.config('financial.integrations.telegram.bot_username', 'bot').'.',
-                $token
-            );
+            if ($user) {
+                $this->reply($chatId, $this->helpMessage(), $token);
+            } else {
+                $this->requestContactForPhoneLink($chatId, $token);
+            }
 
             return ['handled' => true, 'reply' => 'help'];
         }
@@ -78,8 +75,9 @@ class TelegramInboundService
                 $chatId,
                 $user
                     ? 'Telegram vinculado. Agora você pode voltar ao painel e clicar em Testar Telegram.'
-                    : 'Não encontrei sua conta por esse telefone. Confira o telefone salvo no painel ou use o código numérico do @userinfobot.',
-                $token
+                    : 'Não encontrei sua conta por esse telefone. Confira se o mesmo telefone está salvo no painel ou use o código numérico do @userinfobot.',
+                $token,
+                $this->removeKeyboard()
             );
 
             return ['handled' => true, 'reply' => $user ? 'contact_linked' : 'contact_unlinked'];
@@ -359,6 +357,12 @@ class TelegramInboundService
             return null;
         }
 
+        $fromId = $message['from']['id'] ?? null;
+        $contactUserId = $message['contact']['user_id'] ?? null;
+        if ($fromId !== null && $contactUserId !== null && (string) $fromId !== (string) $contactUserId) {
+            return null;
+        }
+
         $phone = $message['contact']['phone_number'] ?? null;
         if (! is_string($phone) || trim($phone) === '') {
             return null;
@@ -379,6 +383,40 @@ class TelegramInboundService
         $notifications['telegram_chat_id'] = $chatId;
         $prefs['notifications'] = $notifications;
         $user->forceFill(['preferences' => $prefs])->save();
+    }
+
+    protected function requestContactForPhoneLink(string $chatId, string $token): void
+    {
+        $this->reply(
+            $chatId,
+            "Para vincular por telefone, toque no botão abaixo e compartilhe seu contato.\n\n".
+            "Se preferir, copie o código numérico que o @userinfobot mostra e salve no campo Telegram do painel:\n".
+            config('app.url').'/integrations/notifications',
+            $token,
+            [
+                'reply_markup' => [
+                    'keyboard' => [
+                        [
+                            [
+                                'text' => 'Compartilhar meu telefone',
+                                'request_contact' => true,
+                            ],
+                        ],
+                    ],
+                    'resize_keyboard' => true,
+                    'one_time_keyboard' => true,
+                ],
+            ]
+        );
+    }
+
+    protected function removeKeyboard(): array
+    {
+        return [
+            'reply_markup' => [
+                'remove_keyboard' => true,
+            ],
+        ];
     }
 
     protected function hasInboundDocument(array $message): bool
@@ -424,9 +462,9 @@ class TelegramInboundService
         return $parts[1] ?? '';
     }
 
-    protected function reply(string $chatId, string $message, string $token): void
+    protected function reply(string $chatId, string $message, string $token, array $options = []): void
     {
-        $result = $this->telegram->send($chatId, $message, $token);
+        $result = $this->telegram->send($chatId, $message, $token, $options);
         if (! ($result['ok'] ?? false)) {
             Log::error('Telegram reply failed', [
                 'chat_id' => $chatId,

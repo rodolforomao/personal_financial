@@ -16,7 +16,7 @@ class TelegramService
     /**
      * @return array{ok: bool, error?: string}
      */
-    public function send(string $chatId, string $message, ?string $botToken = null): array
+    public function send(string $chatId, string $message, ?string $botToken = null, array $options = []): array
     {
         $token = $botToken ?? config('financial.integrations.telegram.bot_token');
         if (! $token) {
@@ -25,10 +25,11 @@ class TelegramService
 
         try {
             $response = Http::external()->timeout(15)
-                ->post("https://api.telegram.org/bot{$token}/sendMessage", [
+                ->post("https://api.telegram.org/bot{$token}/sendMessage", array_filter([
                     'chat_id' => $chatId,
                     'text' => $message,
-                ]);
+                    ...$options,
+                ], fn ($value) => $value !== null));
         } catch (\Throwable $e) {
             Log::warning('Telegram send exception', [
                 'chat_id' => $chatId,
@@ -209,7 +210,7 @@ class TelegramService
     {
         if (str_starts_with($chatId, 'phone:+')) {
             return 'Não achamos seu chat pelo telefone. Abra o bot no Telegram, envie /start e compartilhe seu contato com o bot. '
-                .'Se persistir, use o código numérico que o @userinfobot mostra (ex.: 123456789) no campo destino.';
+                .'Depois volte aqui e clique em Testar Telegram de novo. Se persistir, use o código numérico que o @userinfobot mostra (ex.: 123456789) no campo destino.';
         }
 
         return 'Não achamos seu chat. Abra o bot no Telegram, envie /start e clique em Testar de novo. '

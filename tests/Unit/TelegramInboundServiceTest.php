@@ -96,4 +96,34 @@ class TelegramInboundServiceTest extends TestCase
             $user->fresh()->preferences['notifications']['telegram_chat_id']
         );
     }
+
+    public function test_start_requests_contact_when_phone_destination_is_not_linked_yet(): void
+    {
+        config([
+            'financial.integrations.telegram.bot_token' => 'token',
+            'financial.integrations.telegram.bot_username' => 'financial_bot',
+        ]);
+
+        Http::fake([
+            'https://api.telegram.org/*' => Http::response(['ok' => true, 'result' => []]),
+        ]);
+
+        $result = app(TelegramInboundService::class)->handleUpdate([
+            'message' => [
+                'message_id' => 12,
+                'chat' => [
+                    'id' => 987654321,
+                    'type' => 'private',
+                ],
+                'from' => [
+                    'id' => 987654321,
+                ],
+                'text' => '/start',
+            ],
+        ]);
+
+        $this->assertTrue($result['handled']);
+        $this->assertSame('help', $result['reply']);
+        Http::assertSent(fn ($request) => (bool) data_get($request->data(), 'reply_markup.keyboard.0.0.request_contact'));
+    }
 }
