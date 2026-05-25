@@ -19,6 +19,7 @@ use App\Http\Controllers\Web\PlatformUserController;
 use App\Http\Controllers\Web\ProjectController;
 use App\Http\Controllers\Web\ReceiptExtractController;
 use App\Http\Controllers\Web\StatementImportController;
+use App\Http\Controllers\Web\SubscriptionPaymentController;
 use App\Http\Controllers\Web\TransactionController;
 use App\Http\Controllers\Web\TransactionReceiptController;
 use App\Http\Middleware\SetWebWorkspace;
@@ -40,6 +41,9 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('subscription/pending', [AuthController::class, 'pendingSubscription'])->name('subscription.pending');
+    Route::post('subscription/payment', [SubscriptionPaymentController::class, 'store'])->name('subscription.payment.store');
+    Route::post('subscription/payment/check', [SubscriptionPaymentController::class, 'check'])->name('subscription.payment.check');
+    Route::get('subscription/payments/{payment}/qr-code.svg', [SubscriptionPaymentController::class, 'qrCode'])->name('subscription.payment.qr-code');
 
     Route::middleware('active.access')->group(function () {
         Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');

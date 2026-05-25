@@ -23,6 +23,7 @@ class IntegrationSettingsController extends Controller
     public function edit(Request $request, IntegrationCredentialsResolver $resolver): View
     {
         $user = $request->user();
+        $canViewOperationalDetails = $user->hasRole('admin');
         $prefs = $user->preferences['notifications'] ?? [];
 
         $evolution = app(EvolutionService::class);
@@ -44,6 +45,7 @@ class IntegrationSettingsController extends Controller
                 'connection' => $gmailConnection,
                 'email' => $gmailConnection?->settings['email'] ?? $gmailConnection?->credentials['email'] ?? null,
             ],
+            'canViewOperationalDetails' => $canViewOperationalDetails,
             'operationsGuideHtml' => app(PlatformOperationsGuide::class)->webCardHtml(),
             'operationsGuidePlain' => app(PlatformOperationsGuide::class)->plainTextGuide(),
         ]);
@@ -52,7 +54,11 @@ class IntegrationSettingsController extends Controller
     public function connectGmail(Request $request, GmailOAuthService $gmail): RedirectResponse
     {
         if (! $gmail->configured()) {
-            return back()->with('warning', 'Configure GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET e GMAIL_REDIRECT_URI no .env.');
+            $message = $request->user()->hasRole('admin')
+                ? 'Configure GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET e GMAIL_REDIRECT_URI no .env.'
+                : 'Gmail ainda não está disponível para conexão. Fale com o suporte.';
+
+            return back()->with('warning', $message);
         }
 
         $state = Str::random(40);
@@ -214,7 +220,11 @@ class IntegrationSettingsController extends Controller
         } catch (\Throwable $e) {
             report($e);
 
-            return back()->with('error', 'Falha inesperada ao testar Telegram: '.$e->getMessage());
+            $message = $request->user()->hasRole('admin')
+                ? 'Falha inesperada ao testar Telegram: '.$e->getMessage()
+                : 'Falha inesperada ao testar Telegram. Tente novamente em instantes.';
+
+            return back()->with('error', $message);
         }
 
         if (! empty($result['chat_id'])) {
@@ -225,7 +235,7 @@ class IntegrationSettingsController extends Controller
             ($result['ok'] ?? false) ? 'success' : 'error',
             ($result['ok'] ?? false)
                 ? 'Mensagem de teste enviada no Telegram.'
-                : ($result['error'] ?? 'Falha ao enviar. Verifique token e destino.')
+                : $this->telegramTestErrorMessage($request, $result['error'] ?? null)
         );
     }
 
@@ -238,7 +248,7 @@ class IntegrationSettingsController extends Controller
         $config = $resolver->whatsapp($request->user()->id, (int) $request->attributes->get('workspace_id'));
 
         if (! $config) {
-            return back()->with('warning', 'Configure telefone e API (sistema no .env ou sua URL/token).');
+            return back()->with('warning', 'Informe seu telefone e confira se a integração escolhida está disponível.');
         }
 
         $whatsapp = app(WhatsAppService::class);
@@ -250,9 +260,22 @@ class IntegrationSettingsController extends Controller
                 ? 'Falha ao enviar. Verifique Evolution API (instância conectada, EVOLUTION_* no .env) e o número com DDI.'
                 : 'Falha ao enviar. Verifique URL, token e número.');
 
+        if (! $request->user()->hasRole('admin') && ($config['provider'] ?? '') === 'evolution') {
+            $errorHint = 'Falha ao enviar pelo WhatsApp do sistema. Tente novamente ou fale com o suporte.';
+        }
+
         return back()->with($ok ? 'success' : 'error', $ok
             ? 'Mensagem de teste enviada no WhatsApp.'
             : $errorHint);
+    }
+
+    protected function telegramTestErrorMessage(Request $request, ?string $error): string
+    {
+        if ($request->user()->hasRole('admin')) {
+            return $error ?? 'Falha ao enviar. Verifique token e destino.';
+        }
+
+        return 'Falha ao enviar. Confira o destino informado ou tente novamente em instantes.';
     }
 
     protected function persistTelegramChatId($user, string $chatId): void

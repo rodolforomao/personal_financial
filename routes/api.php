@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\LiquidxPaymentWebhookController;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -27,3 +28,5 @@ Route::post('/auth/login', function (Request $request) {
 Route::middleware('auth:sanctum')->get('/auth/me', fn (Request $request) => response()->json(
     $request->user()->load('workspaces')
 ));
+
+Route::post('/webhooks/liquidx/payments', LiquidxPaymentWebhookController::class)->name('webhooks.liquidx.payments');

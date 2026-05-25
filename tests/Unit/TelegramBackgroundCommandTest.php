@@ -17,8 +17,10 @@ class TelegramBackgroundCommandTest extends TestCase
         Queue::fake();
     }
 
-    public function test_poll_command_is_public(): void
+    public function test_poll_command_is_denied_without_admin(): void
     {
+        config(['financial.integrations.telegram.admin_chat_ids' => []]);
+
         $user = new User;
         $user->preferences = ['notifications' => []];
 
@@ -27,6 +29,19 @@ class TelegramBackgroundCommandTest extends TestCase
 
         $this->assertNotNull($result);
         $this->assertTrue($result['handled']);
+        $this->assertSame('denied', $result['reply']);
+        Queue::assertNotPushed(ProcessTelegramPollJob::class);
+    }
+
+    public function test_poll_allowed_for_admin_chat_id(): void
+    {
+        config(['financial.integrations.telegram.admin_chat_ids' => ['12345']]);
+
+        $user = new User;
+
+        $service = app(TelegramBackgroundCommandService::class);
+        $result = $service->tryHandle('/poll', $user, '12345');
+
         $this->assertSame('poll_dispatched', $result['reply']);
         Queue::assertPushed(ProcessTelegramPollJob::class);
     }

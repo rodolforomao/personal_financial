@@ -29,11 +29,11 @@ class TelegramBackgroundCommandService
         $arg = $parts[1] ?? '';
 
         return match ($command) {
-            '/poll' => $this->dispatchPoll($chatId),
+            '/poll' => $this->dispatchPoll($user, $chatId),
             '/fila', '/queue' => $this->dispatchQueueDrain($user, $chatId),
             '/run', '/exec' => $this->dispatchRunAlias($user, $chatId, $arg),
             '/comandos', '/commands' => $this->listCommands($user, $chatId),
-            '/ops', '/status', '/processos' => $this->sendOperationsStatus($chatId),
+            '/ops', '/status', '/processos' => $this->sendOperationsStatus($user, $chatId),
             default => null,
         };
     }
@@ -41,8 +41,12 @@ class TelegramBackgroundCommandService
     /**
      * @return array{handled: bool, reply: string}
      */
-    protected function dispatchPoll(string $chatId): array
+    protected function dispatchPoll(User $user, string $chatId): array
     {
+        if (! $this->canRunProtected($user, $chatId)) {
+            return $this->denied();
+        }
+
         ProcessTelegramPollJob::dispatch($chatId);
 
         return [
@@ -86,14 +90,22 @@ class TelegramBackgroundCommandService
     protected function dispatchRunAlias(User $user, string $chatId, string $alias): array
     {
         if ($alias === '') {
+            if (! $this->canRunProtected($user, $chatId)) {
+                return $this->denied();
+            }
+
             return [
                 'handled' => true,
                 'reply' => 'run_usage',
             ];
         }
 
-        $commands = config('financial.integrations.telegram.background_commands', []);
+        $commands = (array) config('financial.integrations.telegram.background_commands', []);
         if (! isset($commands[$alias])) {
+            if (! $this->canRunProtected($user, $chatId)) {
+                return $this->denied();
+            }
+
             return [
                 'handled' => true,
                 'reply' => 'run_unknown',
@@ -145,8 +157,12 @@ class TelegramBackgroundCommandService
     /**
      * @return array{handled: bool, reply: string}
      */
-    protected function sendOperationsStatus(string $chatId): array
+    protected function sendOperationsStatus(User $user, string $chatId): array
     {
+        if (! $this->canRunProtected($user, $chatId)) {
+            return $this->denied();
+        }
+
         $this->reply($chatId, $this->operationsGuide->operationsStatus());
 
         return ['handled' => true, 'reply' => 'ops_status'];
@@ -165,7 +181,7 @@ class TelegramBackgroundCommandService
 
     public function canRunProtected(User $user, string $chatId): bool
     {
-        $adminIds = config('financial.integrations.telegram.admin_chat_ids', []);
+        $adminIds = (array) config('financial.integrations.telegram.admin_chat_ids', []);
         if ($adminIds !== [] && in_array($chatId, $adminIds, true)) {
             return true;
         }
@@ -175,7 +191,7 @@ class TelegramBackgroundCommandService
 
     protected function isAllowedArtisan(string $command): bool
     {
-        $allowed = config('financial.integrations.telegram.allowed_artisan_commands', []);
+        $allowed = (array) config('financial.integrations.telegram.allowed_artisan_commands', []);
 
         return in_array($command, $allowed, true);
     }
@@ -184,8 +200,7 @@ class TelegramBackgroundCommandService
     {
         return match ($replyKey) {
             'poll_dispatched' => "⏳ Busca de mensagens iniciada em segundo plano.\n".
-                "Você receberá um resumo quando terminar.\n\n".
-                'Dica: TELEGRAM_SCHEDULED_POLL=true + php artisan schedule:work — veja /ops.',
+                'Você receberá um resumo quando terminar.',
             'queue_dispatched' => "⏳ Processando fila em segundo plano (`queue:work`).\n".
                 "Confira o resumo em instantes.",
             'run_dispatched' => "⏳ Comando `{$alias}` enfileirado. Aviso quando concluir.",

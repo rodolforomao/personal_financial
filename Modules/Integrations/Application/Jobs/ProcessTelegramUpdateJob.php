@@ -2,7 +2,6 @@
 
 namespace Modules\Integrations\Application\Jobs;
 
-use App\Application\Services\PlatformOperationsGuide;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -45,8 +44,7 @@ class ProcessTelegramUpdateJob implements ShouldQueue
                 $telegram->send(
                     $chatId,
                     "⚠️ Erro ao processar sua mensagem.\n".
-                    "Tente enviar a foto do comprovante de novo ou use: Receita de 356 descrição\n\n".
-                    'Detalhe: '.mb_substr($e->getMessage(), 0, 120),
+                    'Tente enviar a foto do comprovante de novo ou use: Receita de 356 descrição',
                     $token
                 );
             }
@@ -65,10 +63,10 @@ class ProcessTelegramUpdateJob implements ShouldQueue
             return;
         }
 
-        $hint = mb_substr(app(PlatformOperationsGuide::class)->recommendedProcessesPlain(), 0, 500);
         app(TelegramService::class)->send(
             $chatId,
-            "⚠️ Não consegui processar (timeout ou fila parada).\n\n{$hint}\n\nDetalhe: /ops no bot.",
+            "⚠️ Não consegui processar sua mensagem agora.\n\n".
+            'Tente enviar novamente em instantes. Se persistir, fale com o suporte.',
             $token
         );
     }

@@ -7,17 +7,21 @@
     <li class="breadcrumb-item active">Integrações</li>
 @endsection
 
+@php($canViewOperationalDetails = $canViewOperationalDetails ?? false)
+
 @section('content')
-<div class="card card-outline card-info mb-3">
-    <div class="card-header"><h3 class="card-title mb-0"><i class="bi bi-terminal"></i> Processos no servidor</h3></div>
-    <div class="card-body">
-        {!! $operationsGuideHtml !!}
-        <details class="mt-2">
-            <summary class="small text-muted" style="cursor:pointer">Lista completa de comandos artisan</summary>
-            <pre class="bg-light p-2 rounded small mt-2 mb-0" style="white-space:pre-wrap">{{ $operationsGuidePlain }}</pre>
-        </details>
+@if($canViewOperationalDetails)
+    <div class="card card-outline card-info mb-3">
+        <div class="card-header"><h3 class="card-title mb-0"><i class="bi bi-terminal"></i> Processos no servidor</h3></div>
+        <div class="card-body">
+            {!! $operationsGuideHtml !!}
+            <details class="mt-2">
+                <summary class="small text-muted" style="cursor:pointer">Lista completa de comandos artisan</summary>
+                <pre class="bg-light p-2 rounded small mt-2 mb-0" style="white-space:pre-wrap">{{ $operationsGuidePlain }}</pre>
+            </details>
+        </div>
     </div>
-</div>
+@endif
 
 <form action="{{ route('integrations.settings.update') }}" method="POST" id="integrations-form">
     @csrf
@@ -55,7 +59,7 @@
                 <p class="text-muted small mb-3">
                     <strong>Lançamentos por mensagem:</strong> após vincular, envie ao bot textos como
                     <em>Gasto de 16.000 aporte Multfilmes GYN</em> — o sistema cria o lançamento se ainda não existir.
-                    No bot: <code>/ops</code> e <code>/comandos</code>. Dev: um terminal <code>php artisan schedule:work</code> (ver card acima). Produção: <code>telegram:webhook-sync</code>.
+                    Você também pode enviar fotos, PDFs ou XMLs de comprovantes para conferência antes de salvar.
                 </p>
 
                 <div class="mb-3">
@@ -63,12 +67,21 @@
                         <input class="form-check-input" type="radio" name="telegram_mode" id="tg-system" value="system"
                             @checked(($prefs['telegram_mode'] ?? 'system') === 'system')>
                         <label class="form-check-label" for="tg-system">
-                            <strong>Bot do sistema</strong> (<code>TELEGRAM_BOT_TOKEN</code> no servidor)
+                            <strong>Bot do sistema</strong>
+                            @if($canViewOperationalDetails)
+                                <span class="text-muted">(<code>TELEGRAM_BOT_TOKEN</code> no servidor)</span>
+                            @endif
                         </label>
                         @if($status['telegram_system'])
-                            <div class="form-text text-success"><i class="bi bi-check-circle"></i> Token do sistema configurado</div>
+                            <div class="form-text text-success"><i class="bi bi-check-circle"></i> Bot do sistema disponível</div>
                         @else
-                            <div class="form-text text-warning"><i class="bi bi-exclamation-triangle"></i> Admin deve preencher <code>TELEGRAM_BOT_TOKEN</code> no <code>.env</code></div>
+                            <div class="form-text text-warning"><i class="bi bi-exclamation-triangle"></i>
+                                @if($canViewOperationalDetails)
+                                    Admin deve preencher <code>TELEGRAM_BOT_TOKEN</code> no <code>.env</code>
+                                @else
+                                    Bot do sistema indisponível no momento. Use seu próprio bot ou fale com o suporte.
+                                @endif
+                            </div>
                         @endif
                     </div>
                     <div class="form-check">
@@ -133,12 +146,12 @@
                         @if($status['whatsapp_system'])
                             @if(($evolution['provider'] ?? '') === 'evolution')
                                 <div class="form-text text-success">
-                                    <i class="bi bi-check-circle"></i> Evolution API configurada
-                                    @if(!empty($evolution['connection']['state']))
+                                    <i class="bi bi-check-circle"></i> WhatsApp do sistema disponível
+                                    @if($canViewOperationalDetails && !empty($evolution['connection']['state']))
                                         — sessão: <strong>{{ $evolution['connection']['state'] }}</strong>
                                     @endif
                                 </div>
-                                @if(($evolution['connection']['state'] ?? '') !== 'open')
+                                @if($canViewOperationalDetails && ($evolution['connection']['state'] ?? '') !== 'open')
                                     <div class="form-text text-danger mt-1">
                                         <i class="bi bi-exclamation-octagon"></i>
                                         Status atual: <strong>{{ $evolution['connection']['state'] ?? 'desconhecido' }}</strong>.
@@ -148,15 +161,19 @@
                                     </div>
                                 @endif
                             @else
-                                <div class="form-text text-success"><i class="bi bi-check-circle"></i> URL e token do sistema configurados</div>
+                                <div class="form-text text-success"><i class="bi bi-check-circle"></i> WhatsApp do sistema disponível</div>
                             @endif
                         @else
                             <div class="form-text text-warning"><i class="bi bi-exclamation-triangle"></i>
-                                Admin:
-                                @if(($evolution['provider'] ?? 'evolution') === 'evolution')
-                                    <code>EVOLUTION_API_URL</code>, <code>EVOLUTION_API_KEY</code> e <code>EVOLUTION_INSTANCE_NAME</code> no <code>.env</code>
+                                @if($canViewOperationalDetails)
+                                    Admin:
+                                    @if(($evolution['provider'] ?? 'evolution') === 'evolution')
+                                        <code>EVOLUTION_API_URL</code>, <code>EVOLUTION_API_KEY</code> e <code>EVOLUTION_INSTANCE_NAME</code> no <code>.env</code>
+                                    @else
+                                        <code>WHATSAPP_API_URL</code> e <code>WHATSAPP_API_TOKEN</code> no <code>.env</code>
+                                    @endif
                                 @else
-                                    <code>WHATSAPP_API_URL</code> e <code>WHATSAPP_API_TOKEN</code> no <code>.env</code>
+                                    WhatsApp do sistema indisponível no momento. Use sua própria API ou fale com o suporte.
                                 @endif
                             </div>
                         @endif
@@ -233,9 +250,13 @@
                     @endif
                 @else
                     <div class="alert alert-warning py-2">
-                        Admin: configure a credencial OAuth do aplicativo Google
-                        (<code>GMAIL_CLIENT_ID</code>, <code>GMAIL_CLIENT_SECRET</code> e <code>GMAIL_REDIRECT_URI</code>).
-                        A conta Gmail e os tokens de cada usuário são salvos criptografados no banco, não no <code>.env</code>.
+                        @if($canViewOperationalDetails)
+                            Admin: configure a credencial OAuth do aplicativo Google
+                            (<code>GMAIL_CLIENT_ID</code>, <code>GMAIL_CLIENT_SECRET</code> e <code>GMAIL_REDIRECT_URI</code>).
+                            A conta Gmail e os tokens de cada usuário são salvos criptografados no banco, não no <code>.env</code>.
+                        @else
+                            Gmail ainda não está disponível para conexão. Fale com o suporte para liberar esse recurso.
+                        @endif
                     </div>
                 @endif
 
@@ -286,7 +307,9 @@
                 <p><strong>Token do bot</strong> = qual robô envia (só se for <em>seu</em> bot no @BotFather).</p>
                 <p>No WhatsApp só precisa do <strong>número</strong>; o servidor envia via <strong>Evolution API</strong> (instância única) ou pela sua API.</p>
                 <p class="mb-0">No Gmail, cada usuário autoriza a própria conta via OAuth. A credencial no Google Cloud é só do aplicativo e usa redirect <code>{{ route('integrations.gmail.callback') }}</code>.</p>
-                <p class="mb-0 mt-2 text-muted">Setup do admin: <code>docs/WHATSAPP_EVOLUTION.md</code> no repositório.</p>
+                @if($canViewOperationalDetails)
+                    <p class="mb-0 mt-2 text-muted">Setup do admin: <code>docs/WHATSAPP_EVOLUTION.md</code> no repositório.</p>
+                @endif
             </div>
         </div>
     </div>

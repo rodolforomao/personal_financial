@@ -53,12 +53,6 @@ class TelegramInboundService
             return ['handled' => true, 'reply' => 'help'];
         }
 
-        if ($text !== '' && ($this->isCommand($text, '/ops') || $this->isCommand($text, '/status') || $this->isCommand($text, '/processos'))) {
-            $this->reply($chatId, $this->operationsGuide->operationsStatus(), $token);
-
-            return ['handled' => true, 'reply' => 'ops_status'];
-        }
-
         if ($text !== '' && ($this->isCommand($text, '/comandos') || $this->isCommand($text, '/commands'))) {
             $user = $this->resolveUserByChatId($chatId);
             if ($user) {

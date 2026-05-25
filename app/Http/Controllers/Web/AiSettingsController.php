@@ -29,6 +29,7 @@ class AiSettingsController extends Controller
             'modelsByProvider' => AiModelCatalog::allGrouped(),
             'selectedModel' => AiModelCatalog::resolveModel($provider, $aiPrefs['model'] ?? null),
             'selectedProvider' => $provider,
+            'canViewOperationalDetails' => $user->hasRole('admin'),
             'modelHints' => collect(AiModelCatalog::allGrouped())
                 ->map(fn ($models) => collect($models)->mapWithKeys(fn ($m, $id) => [$id => $m['hint'] ?? '']))
                 ->all(),

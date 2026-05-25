@@ -217,7 +217,7 @@
                         @empty
                             <tr>
                                 <td colspan="8" class="text-center text-muted py-4">
-                                    Nenhuma regra. Adicione Uber, Evento B3 ou importe padrões via <code>php artisan db:seed</code>.
+                                    Nenhuma regra. Adicione exemplos como Uber ou Evento B3 para automatizar categorias.
                                 </td>
                             </tr>
                         @endforelse

@@ -22,7 +22,7 @@
             <div class="card-body">
                 <input type="file" name="file" id="document-file" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp">
                 <small class="text-muted d-block mt-2">
-                    PDF (com IA no .env) ou imagem — extrai dados para nova transação.
+                    PDF (com IA ativa) ou imagem — extrai dados para nova transação.
                 </small>
                 <div id="doc-scan-status" class="small mt-2"></div>
             </div>

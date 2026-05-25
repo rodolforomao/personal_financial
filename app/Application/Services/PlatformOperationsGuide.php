@@ -9,10 +9,7 @@ class PlatformOperationsGuide
         return "Olá! Sou o assistente financeiro.\n\n".
             "📄 Foto ou PDF de comprovante → confirme com SIM ou NÃO.\n".
             "✏️ Texto livre: Gasto de 500 limpeza apto 001\n\n".
-            "⚙️ Sem vários terminais:\n".
-            "• /ops — o que o servidor precisa rodar\n".
-            "• /comandos — tarefas pelo Telegram\n".
-            "• /poll — buscar mensagens (se não usar webhook)\n\n".
+            "Use /comandos para ver as ações disponíveis para sua conta.\n\n".
             "1. Vincule em ".config('app.url')."/integrations/notifications\n".
             "2. /start neste bot";
     }
@@ -34,25 +31,24 @@ class PlatformOperationsGuide
 
     public function commandsForTelegram(bool $isAdmin): string
     {
-        $lines = ["🤖 Comandos no bot (sem terminal aberto)\n"];
-        $lines[] = '/ops — status e processos necessários';
-        $lines[] = '/poll — 1 ciclo getUpdates (dev sem HTTPS)';
-        $lines[] = '/comandos — esta lista + /run';
+        $lines = ["🤖 Comandos no bot\n"];
+        $lines[] = '/help — como enviar lançamentos e comprovantes';
+        $lines[] = '/comandos — esta lista';
 
         if ($isAdmin) {
+            $lines[] = '/ops — status e processos necessários';
+            $lines[] = '/poll — 1 ciclo getUpdates';
             $lines[] = '/fila — processa jobs (notifications, default, ocr, ai)';
-            foreach (config('financial.integrations.telegram.background_commands', []) as $alias => $def) {
+            foreach ((array) config('financial.integrations.telegram.background_commands', []) as $alias => $def) {
                 if ($def['public'] ?? false) {
                     continue;
                 }
                 $desc = $def['description'] ?? $def['label'] ?? $alias;
                 $lines[] = "/run {$alias} — {$desc}";
             }
-        } else {
-            $lines[] = "\n(run e /fila: admin — TELEGRAM_ADMIN_CHAT_IDS no .env)";
-        }
 
-        $lines[] = "\n".$this->scheduledViaEnvHint();
+            $lines[] = "\n".$this->scheduledViaEnvHint();
+        }
 
         return implode("\n", $lines);
     }
@@ -102,7 +98,7 @@ class PlatformOperationsGuide
 <p class="mb-2"><strong>Em desenvolvimento</strong> — um único processo costuma bastar:</p>
 <pre class="bg-light p-2 rounded mb-2"><code>php artisan schedule:work</code></pre>
 <p class="small text-muted mb-2">Com <code>TELEGRAM_SCHEDULED_POLL=true</code> e <code>TELEGRAM_SCHEDULED_QUEUE=true</code> no <code>.env</code> (substitui terminais com <code>telegram:poll</code> e <code>queue:listen</code>).</p>
-<p class="small mb-2">Agendamento: poll automático <strong>{$poll}</strong>, fila automática <strong>{$queue}</strong>, fila global <code>{$this->e(config('queue.default'))}</code>.</p>
+<p class="small mb-2">Agendamento: poll automático <strong>{$poll}</strong>, fila automática <strong>{$queue}</strong>, fila global <code>{$this->e((string) config('queue.default'))}</code>.</p>
 HTML.($sync
             ? '<p class="small text-success mb-0">Com <code>QUEUE_CONNECTION=sync</code>, comprovantes Telegram/WhatsApp processam na hora (webhook ou poll).</p>'
             : '<p class="small mb-0">Produção: <code>docker compose up -d</code> sobe <code>horizon</code> + <code>scheduler</code>. Bot: <code>/ops</code> e <code>/comandos</code>.</p>');

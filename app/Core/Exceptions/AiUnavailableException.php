@@ -29,7 +29,7 @@ class AiUnavailableException extends RuntimeException
     public function userMessage(): string
     {
         return match ($this->getMessage()) {
-            'ai_not_configured' => 'A IA não está configurada. Use sua própria API key em Inteligência → Configuração IA ou peça ao administrador para ativar a IA do sistema no servidor (.env).',
+            'ai_not_configured' => 'A IA não está configurada. Use sua própria API key em Inteligência → Configuração IA ou fale com o suporte para ativar a IA da plataforma.',
             'ai_platform_billing_not_accepted' => 'Para usar a IA da plataforma, aceite os termos de cobrança em Inteligência → Configuração IA (modo "IA da plataforma").',
             'ai_invalid_key' => 'A API key informada é inválida ou expirou. Atualize em Inteligência → Configuração IA.',
             default => str_starts_with($this->getMessage(), 'ai_provider_error:')

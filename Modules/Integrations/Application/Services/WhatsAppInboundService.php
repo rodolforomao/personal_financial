@@ -75,8 +75,8 @@ class WhatsAppInboundService
             $this->reply(
                 $phone,
                 "Não consegui baixar o comprovante.\n".
-                "• Rode: php artisan evolution:webhook-sync\n".
-                "• Ou envie o comprovante pelo Telegram\n".
+                "• Tente reenviar o arquivo pelo WhatsApp\n".
+                "• Se preferir, envie o comprovante pelo Telegram\n".
                 '• Texto continua funcionando: Gasto de 100 descrição'
             );
 

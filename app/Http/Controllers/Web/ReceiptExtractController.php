@@ -29,7 +29,7 @@ class ReceiptExtractController extends Controller
         if (str_contains($mime, 'pdf') && empty(config('financial.ai.openai.api_key'))) {
             return response()->json([
                 'ok' => false,
-                'message' => 'PDF exige IA (OPENAI_API_KEY no .env). Envie JPG/PNG ou configure a chave.',
+                'message' => 'PDF exige IA ativa. Envie JPG/PNG ou ative a IA em Configuração IA.',
             ], 422);
         }
 

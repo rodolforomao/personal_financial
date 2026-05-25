@@ -7,6 +7,8 @@
     <li class="breadcrumb-item active">Configuração</li>
 @endsection
 
+@php($canViewOperationalDetails = $canViewOperationalDetails ?? false)
+
 @section('content')
 <div class="row">
     <div class="col-lg-7">
@@ -37,9 +39,15 @@
                             </label>
                             <div class="form-text">
                                 @if($status['system_available'])
-                                    <span class="text-success"><i class="bi bi-check-circle"></i> Disponível neste servidor</span>
+                                    <span class="text-success"><i class="bi bi-check-circle"></i> IA da plataforma disponível</span>
                                 @else
-                                    <span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Configure <code>OPENAI_API_KEY</code> no <code>.env</code></span>
+                                    <span class="text-warning"><i class="bi bi-exclamation-triangle"></i>
+                                        @if($canViewOperationalDetails)
+                                            Configure <code>OPENAI_API_KEY</code> no <code>.env</code>
+                                        @else
+                                            IA da plataforma indisponível no momento
+                                        @endif
+                                    </span>
                                 @endif
                             </div>
                         </div>
@@ -153,7 +161,7 @@
                         <br><small class="text-muted font-monospace">{{ $status['model'] ?? '' }}</small>
                     </li>
                     <li class="mb-2">
-                        <i class="bi bi-building"></i> Sistema: {{ $status['system_available'] ? 'disponível' : 'indisponível' }}
+                        <i class="bi bi-building"></i> Plataforma: {{ $status['system_available'] ? 'disponível' : 'indisponível' }}
                     </li>
                     <li class="mb-2">
                         <i class="bi bi-person"></i> Sua chave: {{ $status['user_has_key'] ? 'cadastrada' : 'não cadastrada' }}

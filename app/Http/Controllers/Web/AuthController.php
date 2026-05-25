@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\SubscriptionProfile;
 use App\Models\User;
+use App\Services\LiquidxPaymentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -102,7 +103,7 @@ class AuthController extends Controller
             ->with('success', 'Cadastro criado. Confirme o pagamento para liberar o acesso automaticamente.');
     }
 
-    public function pendingSubscription(Request $request): View|RedirectResponse
+    public function pendingSubscription(Request $request, LiquidxPaymentService $payments): View|RedirectResponse
     {
         $user = $request->user()->loadMissing('subscriptionProfile');
 
@@ -113,6 +114,8 @@ class AuthController extends Controller
         return view('auth.subscription-pending', [
             'user' => $user,
             'profile' => $user->subscriptionProfile ?? $this->defaultSubscriptionProfile(),
+            'payment' => $payments->latestPaymentFor($user),
+            'liquidxConfigured' => $payments->configured(),
         ]);
     }
 

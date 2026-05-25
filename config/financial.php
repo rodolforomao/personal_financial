@@ -10,6 +10,20 @@ return [
         'require_password_for_transaction_sensitive_edit' => env('FINANCIAL_REQUIRE_PASSWORD_ON_EDIT', true),
     ],
 
+    'billing' => [
+        'liquidx' => [
+            'base_url' => rtrim(env('LIQUIDX_API_BASE_URL', 'https://liquidx.pro/api'), '/'),
+            'api_key' => env('LIQUIDX_API_KEY'),
+            'integrated_code' => env('LIQUIDX_INTEGRATED_CODE'),
+            'integrated_payment_path' => env('LIQUIDX_INTEGRATED_PAYMENT_PATH', '/integrated-payment'),
+            'integrated_payment_status_path' => env('LIQUIDX_INTEGRATED_PAYMENT_STATUS_PATH', '/integrated-payment/status'),
+            'thirdwallet' => env('LIQUIDX_THIRDWALLET'),
+            'webhook_secret' => env('LIQUIDX_WEBHOOK_SECRET'),
+            'timeout' => (int) env('LIQUIDX_HTTP_TIMEOUT', 20),
+            'default_payer_phone' => env('LIQUIDX_DEFAULT_PAYER_PHONE'),
+        ],
+    ],
+
     'ai' => [
         'default' => env('AI_PROVIDER', 'openai'),
         'system_enabled' => env('AI_SYSTEM_ENABLED', true),
@@ -158,7 +172,7 @@ return [
                     'label' => 'telegram:poll --once',
                     'description' => 'Um ciclo de poll (alias de /poll)',
                     'options' => ['--once' => true],
-                    'public' => true,
+                    'public' => false,
                 ],
             ],
         ],

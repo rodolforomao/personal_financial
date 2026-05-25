@@ -126,7 +126,7 @@
 </div>
 @else
 <div class="alert alert-secondary mb-4">
-    <i class="bi bi-info-circle"></i> Logs do servidor visíveis apenas para <strong>administradores</strong>.
+    <i class="bi bi-info-circle"></i> Diagnóstico técnico disponível apenas para <strong>administradores</strong>.
     Você vê os alertas financeiros do workspace abaixo.
 </div>
 @endif
