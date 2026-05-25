@@ -184,6 +184,17 @@ return [
             // Envia imagens/PDF em base64 no webhook (comprovantes WhatsApp)
             'webhook_base64' => env('EVOLUTION_WEBHOOK_BASE64', true),
         ],
+        'gmail' => [
+            'client_id' => env('GMAIL_CLIENT_ID'),
+            'client_secret' => env('GMAIL_CLIENT_SECRET'),
+            'redirect_uri' => env('GMAIL_REDIRECT_URI'),
+            'scheduled_sync' => env('GMAIL_SCHEDULED_SYNC', false),
+            'sync_limit' => (int) env('GMAIL_SYNC_LIMIT', 25),
+            'search_query' => env(
+                'GMAIL_SEARCH_QUERY',
+                'newer_than:30d (compra OR gasto OR despesa OR pagamento OR pix OR recebido OR recebimento OR boleto OR fatura OR "nota fiscal" OR nf-e)'
+            ),
+        ],
     ],
 
     'statement_import' => [

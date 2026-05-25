@@ -24,4 +24,7 @@
         </div>
     </div>
 </form>
+<p class="mb-0 mt-3 text-center">
+    <a href="{{ route('register') }}">Criar nova conta</a>
+</p>
 @endsection

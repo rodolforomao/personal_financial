@@ -1,7 +1,7 @@
 @extends('layouts.adminlte')
 
-@section('title', 'Telegram e WhatsApp')
-@section('page_title', 'Notificações — Telegram e WhatsApp')
+@section('title', 'Integrações')
+@section('page_title', 'Integrações — Mensagens e Gmail')
 @section('breadcrumb')
     <li class="breadcrumb-item"><a href="{{ route('alerts.index') }}">Alertas</a></li>
     <li class="breadcrumb-item active">Integrações</li>
@@ -44,7 +44,7 @@
                         e clique em <strong>Testar Telegram</strong> — o sistema descobre o ID automaticamente.
                         <br>Ou cole o <strong>número do chat</strong> do @userinfobot (ex. <code>1722629689</code>).
                         <br><span class="text-warning">@usuario sozinho não funciona em conversa privada no Telegram.</span>
-                        <br>Envie <strong>fotos de comprovante</strong> ao bot — o sistema pergunta se os dados estão corretos antes de salvar.
+                        <br>Envie <strong>fotos/PDF/XML de comprovante ou nota fiscal</strong> ao bot — o sistema pergunta se os dados estão corretos antes de salvar.
                     </div>
                 </div>
 
@@ -200,9 +200,75 @@
             </div>
         </div>
 
+        <div class="card mb-4">
+            <div class="card-header"><h3 class="card-title"><i class="bi bi-envelope"></i> Gmail</h3></div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    Conecte uma conta Google para ler e-mails recentes de compras, PIX, boletos, faturas, notas fiscais
+                    e recebimentos. Cada usuário conecta o próprio Gmail via OAuth; o sistema cria transações com
+                    <code>source=gmail</code> e evita duplicar mensagens já lidas.
+                </p>
+
+                @if($gmail['configured'])
+                    @if($gmail['connection'])
+                        <div class="alert alert-success py-2">
+                            <i class="bi bi-check-circle"></i>
+                            Gmail conectado
+                            @if($gmail['email'])
+                                — <strong>{{ $gmail['email'] }}</strong>
+                            @endif
+                            @if($gmail['connection']->last_sync_at)
+                                <br><small>Última sincronização: {{ $gmail['connection']->last_sync_at->format('d/m/Y H:i') }}</small>
+                            @endif
+                        </div>
+                        @if($gmail['connection']->last_error)
+                            <div class="alert alert-warning py-2">
+                                Último erro: {{ $gmail['connection']->last_error }}
+                            </div>
+                        @endif
+                    @else
+                        <div class="alert alert-light border py-2 mb-3">
+                            Gmail ainda não conectado neste workspace.
+                        </div>
+                    @endif
+                @else
+                    <div class="alert alert-warning py-2">
+                        Admin: configure a credencial OAuth do aplicativo Google
+                        (<code>GMAIL_CLIENT_ID</code>, <code>GMAIL_CLIENT_SECRET</code> e <code>GMAIL_REDIRECT_URI</code>).
+                        A conta Gmail e os tokens de cada usuário são salvos criptografados no banco, não no <code>.env</code>.
+                    </div>
+                @endif
+
+                <p class="small text-muted mb-0">
+                    Escopo usado: leitura somente (<code>gmail.readonly</code>). Nenhum e-mail é alterado ou apagado.
+                    A conexão abaixo vale apenas para o seu usuário neste workspace.
+                </p>
+            </div>
+            <div class="card-footer d-flex flex-wrap gap-2">
+                @if($gmail['configured'])
+                    <a href="{{ route('integrations.gmail.connect') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-google"></i>
+                        {{ $gmail['connection'] ? 'Reconectar Gmail' : 'Conectar Gmail' }}
+                    </a>
+                @endif
+                @if($gmail['connection'])
+                    <button type="submit" formmethod="post" formaction="{{ route('integrations.gmail.sync') }}" class="btn btn-outline-success">
+                        <i class="bi bi-arrow-repeat"></i> Sincronizar agora
+                    </button>
+                    <button type="submit"
+                            formmethod="post"
+                            formaction="{{ route('integrations.gmail.disconnect') }}"
+                            onclick="event.preventDefault(); const f=this.form; const m=document.createElement('input'); m.type='hidden'; m.name='_method'; m.value='DELETE'; f.appendChild(m); f.action=this.formAction; f.submit();"
+                            class="btn btn-outline-danger">
+                        Desconectar
+                    </button>
+                @endif
+            </div>
+        </div>
+
         <div class="card card-outline card-primary">
             <div class="card-body py-3">
-                <p class="mb-0 small text-muted">Salva Telegram e WhatsApp de uma vez (destino, tokens e preferências de alerta).</p>
+                <p class="mb-0 small text-muted">Salva Telegram e WhatsApp de uma vez (destino, tokens e preferências de alerta). Gmail usa OAuth separado.</p>
             </div>
             <div class="card-footer">
                 <button type="submit" class="btn btn-primary">
@@ -218,7 +284,8 @@
             <div class="card-body small">
                 <p><strong>Destino</strong> = quem recebe (você: @usuario ou chat).</p>
                 <p><strong>Token do bot</strong> = qual robô envia (só se for <em>seu</em> bot no @BotFather).</p>
-                <p class="mb-0">No WhatsApp só precisa do <strong>número</strong>; o servidor envia via <strong>Evolution API</strong> (instância única) ou pela sua API.</p>
+                <p>No WhatsApp só precisa do <strong>número</strong>; o servidor envia via <strong>Evolution API</strong> (instância única) ou pela sua API.</p>
+                <p class="mb-0">No Gmail, cada usuário autoriza a própria conta via OAuth. A credencial no Google Cloud é só do aplicativo e usa redirect <code>{{ route('integrations.gmail.callback') }}</code>.</p>
                 <p class="mb-0 mt-2 text-muted">Setup do admin: <code>docs/WHATSAPP_EVOLUTION.md</code> no repositório.</p>
             </div>
         </div>

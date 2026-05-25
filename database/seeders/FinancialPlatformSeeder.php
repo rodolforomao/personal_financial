@@ -2,12 +2,13 @@
 
 namespace Database\Seeders;
 
+use App\Core\Enums\CompanyType;
+use App\Models\SubscriptionProfile;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use App\Core\Enums\CompanyType;
-use Modules\Categorization\Infrastructure\Models\Category;
 use Modules\Categorization\Infrastructure\Models\CategorizationRule;
+use Modules\Categorization\Infrastructure\Models\Category;
 use Modules\Companies\Infrastructure\Models\Company;
 use Modules\Core\Infrastructure\Models\FeatureFlag;
 use Modules\Core\Infrastructure\Models\Workspace;
@@ -23,15 +24,32 @@ class FinancialPlatformSeeder extends Seeder
             ['name' => 'Workspace Principal', 'currency' => 'BRL']
         );
 
+        $defaultProfile = SubscriptionProfile::query()->firstOrCreate(
+            ['slug' => 'mensal'],
+            [
+                'name' => 'Mensal',
+                'monthly_price_cents' => 2000,
+                'description' => 'Acesso padrão ao Financial IQ.',
+                'is_active' => true,
+            ],
+        );
+
         $user = User::query()->firstOrCreate(
             ['email' => 'admin@financial.local'],
             [
                 'name' => 'Administrador',
                 'password' => Hash::make('password'),
                 'is_platform_internal' => true,
+                'subscription_profile_id' => $defaultProfile->id,
+                'access_status' => User::ACCESS_MANUAL_RELEASE,
             ]
         );
-        $user->forceFill(['is_platform_internal' => true])->save();
+        $user->forceFill([
+            'is_platform_internal' => true,
+            'subscription_profile_id' => $defaultProfile->id,
+            'access_status' => User::ACCESS_MANUAL_RELEASE,
+            'access_approved_at' => now(),
+        ])->save();
 
         $workspace->users()->syncWithoutDetaching([$user->id => ['role' => 'owner']]);
 
@@ -71,7 +89,7 @@ class FinancialPlatformSeeder extends Seeder
                 [...$cat, 'workspace_id' => $workspace->id, 'is_system' => true]
             );
 
-            foreach (config('financial.default_categorization_patterns', []) as $pattern => $slug) {
+            foreach ((array) config('financial.default_categorization_patterns', []) as $pattern => $slug) {
                 if ($slug !== $cat['slug']) {
                     continue;
                 }

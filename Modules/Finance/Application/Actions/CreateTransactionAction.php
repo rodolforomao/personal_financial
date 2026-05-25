@@ -41,7 +41,7 @@ class CreateTransactionAction
             'recurrence_frequency' => $data->recurrenceFrequency?->value,
         ];
 
-        $autoCategorizeSources = ['telegram', 'whatsapp', 'statement_import', 'ocr', 'api'];
+        $autoCategorizeSources = ['telegram', 'whatsapp', 'gmail', 'statement_import', 'ocr', 'api'];
         if (
             ! $data->categoryId
             && in_array($data->source, $autoCategorizeSources, true)

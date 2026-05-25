@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'workspace' => \App\Core\Http\Middleware\EnsureWorkspaceAccess::class,
             'admin' => \App\Http\Middleware\EnsureAdminRole::class,
+            'active.access' => \App\Http\Middleware\EnsureActivePlatformAccess::class,
         ]);
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,

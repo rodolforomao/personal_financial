@@ -20,11 +20,20 @@ class TelegramService
             return ['ok' => false, 'error' => 'Token do bot não configurado no servidor (.env TELEGRAM_BOT_TOKEN).'];
         }
 
-        $response = Http::external()->timeout(15)
-            ->post("https://api.telegram.org/bot{$token}/sendMessage", [
+        try {
+            $response = Http::external()->timeout(15)
+                ->post("https://api.telegram.org/bot{$token}/sendMessage", [
+                    'chat_id' => $chatId,
+                    'text' => $message,
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('Telegram send exception', [
                 'chat_id' => $chatId,
-                'text' => $message,
+                'message' => $e->getMessage(),
             ]);
+
+            return ['ok' => false, 'error' => 'Falha ao conectar na API do Telegram. Verifique internet/DNS/firewall do servidor e tente novamente.'];
+        }
 
         if ($response->successful()) {
             return ['ok' => true];
@@ -100,7 +109,11 @@ class TelegramService
         }
 
         $username = Str::lower(ltrim($chatRef, '@'));
-        $updates = Http::external()->timeout(10)->get("https://api.telegram.org/bot{$botToken}/getUpdates");
+        try {
+            $updates = Http::external()->timeout(10)->get("https://api.telegram.org/bot{$botToken}/getUpdates");
+        } catch (\Throwable) {
+            return null;
+        }
 
         if (! $updates->successful()) {
             return null;

@@ -433,7 +433,7 @@ class ReceiptExtractionService
             }
         }
 
-        return $extracted;
+        return $this->applyPersonalExpenseDefaults($extracted, implode(' ', array_filter($fields)), $workspaceId);
     }
 
     public function applyUserCaption(array $extracted, string $caption, int $workspaceId): array
@@ -477,7 +477,55 @@ class ReceiptExtractionService
             $extracted['operation_unit_name'] = $context['operation_unit_name'];
         }
 
+        return $this->applyPersonalExpenseDefaults($extracted, $caption, $workspaceId);
+    }
+
+    /**
+     * Regra de negócio: "despesa/despeza pessoal" sempre entra na Pessoa Física,
+     * Operação Geral e como despesa, mesmo quando o comprovante sugere outro contexto.
+     *
+     * @param  array<string, mixed>  $extracted
+     * @return array<string, mixed>
+     */
+    protected function applyPersonalExpenseDefaults(array $extracted, string $text, int $workspaceId): array
+    {
+        if (! $this->isPersonalExpenseText($text)) {
+            return $extracted;
+        }
+
+        $extracted['type'] = TransactionType::Expense->value;
+
+        $company = $this->captionContext->findCompanyByName($workspaceId, 'Pessoa Física');
+        if ($company) {
+            $extracted['company_id'] = $company->id;
+            $extracted['company_name'] = $company->name;
+        } else {
+            $extracted['company_name'] = 'Pessoa Física';
+            unset($extracted['company_id']);
+        }
+
+        $operation = $this->captionContext->findOperationByName($workspaceId, 'Geral', $company)
+            ?? $this->captionContext->findOperationByName($workspaceId, 'Geral (pessoa física)', $company);
+
+        if ($operation) {
+            $extracted['operation_id'] = $operation->id;
+            $extracted['operation_name'] = $operation->name;
+        } else {
+            $extracted['operation_name'] = 'Geral';
+            unset($extracted['operation_id']);
+        }
+
+        unset($extracted['operation_unit_id'], $extracted['operation_unit_name']);
+
         return $extracted;
+    }
+
+    protected function isPersonalExpenseText(string $text): bool
+    {
+        $lower = mb_strtolower($text);
+
+        return (bool) preg_match('/\b(despesa|despesas|despeza|despezas)\b/u', $lower)
+            && (bool) preg_match('/\b(pessoal|pessoais|pessoa\s+f[ií]sica)\b/u', $lower);
     }
 
     protected function detectType(?string $explicit, string $rawText): TransactionType

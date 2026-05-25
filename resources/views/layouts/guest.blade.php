@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Login — {{ config('adminlte.app_name') }}</title>
+    <title>@yield('title', 'Acesso') — {{ config('adminlte.app_name') }}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0-rc7/dist/css/adminlte.min.css">
@@ -16,6 +16,17 @@
     </div>
     <div class="card shadow">
         <div class="card-body login-card-body">
+            @if(session('success'))
+                <div class="alert alert-success small">{{ session('success') }}</div>
+            @endif
+            @if(session('warning'))
+                <div class="alert alert-warning small">{{ session('warning') }}</div>
+            @endif
+            @if($errors->any())
+                <div class="alert alert-danger small">
+                    <ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
+                </div>
+            @endif
             @yield('content')
         </div>
     </div>

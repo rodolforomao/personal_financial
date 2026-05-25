@@ -13,6 +13,8 @@ use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Modules\Alerts\Infrastructure\Models\AlertChannel;
 use Modules\Integrations\Application\Services\EvolutionService;
+use Modules\Integrations\Application\Services\GmailEmailImportService;
+use Modules\Integrations\Application\Services\GmailOAuthService;
 use Modules\Integrations\Application\Services\TelegramService;
 use Modules\Integrations\Application\Services\WhatsAppService;
 
@@ -24,6 +26,9 @@ class IntegrationSettingsController extends Controller
         $prefs = $user->preferences['notifications'] ?? [];
 
         $evolution = app(EvolutionService::class);
+        $workspaceId = (int) $request->attributes->get('workspace_id');
+        $gmail = app(GmailOAuthService::class);
+        $gmailConnection = $gmail->connection($workspaceId, $user->id);
 
         return view('integrations.settings', [
             'status' => $resolver->status($user->id),
@@ -34,9 +39,82 @@ class IntegrationSettingsController extends Controller
                 'configured' => $evolution->configured(),
                 'connection' => $evolution->configured() ? $evolution->connectionState() : null,
             ],
+            'gmail' => [
+                'configured' => $gmail->configured(),
+                'connection' => $gmailConnection,
+                'email' => $gmailConnection?->settings['email'] ?? $gmailConnection?->credentials['email'] ?? null,
+            ],
             'operationsGuideHtml' => app(PlatformOperationsGuide::class)->webCardHtml(),
             'operationsGuidePlain' => app(PlatformOperationsGuide::class)->plainTextGuide(),
         ]);
+    }
+
+    public function connectGmail(Request $request, GmailOAuthService $gmail): RedirectResponse
+    {
+        if (! $gmail->configured()) {
+            return back()->with('warning', 'Configure GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET e GMAIL_REDIRECT_URI no .env.');
+        }
+
+        $state = Str::random(40);
+        $request->session()->put('gmail_oauth_state', [
+            'state' => $state,
+            'workspace_id' => (int) $request->attributes->get('workspace_id'),
+            'user_id' => $request->user()->id,
+        ]);
+
+        return redirect()->away($gmail->authorizationUrl($state));
+    }
+
+    public function gmailCallback(Request $request, GmailOAuthService $gmail): RedirectResponse
+    {
+        $state = $request->session()->pull('gmail_oauth_state');
+        if (! is_array($state) || ! hash_equals((string) ($state['state'] ?? ''), (string) $request->query('state'))) {
+            return redirect()->route('integrations.settings')->with('error', 'Retorno do Gmail inválido. Tente conectar novamente.');
+        }
+
+        if (! $request->filled('code')) {
+            return redirect()->route('integrations.settings')->with('error', 'Gmail não retornou autorização.');
+        }
+
+        try {
+            $result = $gmail->exchangeCode((string) $request->query('code'));
+            $gmail->storeConnection(
+                (int) $state['workspace_id'],
+                (int) $state['user_id'],
+                $result['token'],
+                $result['email'],
+            );
+        } catch (\Throwable $e) {
+            return redirect()->route('integrations.settings')->with('error', 'Falha ao conectar Gmail: '.$e->getMessage());
+        }
+
+        return redirect()->route('integrations.settings')->with('success', 'Gmail conectado. Você já pode sincronizar e-mails financeiros.');
+    }
+
+    public function disconnectGmail(Request $request, GmailOAuthService $gmail): RedirectResponse
+    {
+        $gmail->disconnect((int) $request->attributes->get('workspace_id'), $request->user()->id);
+
+        return back()->with('success', 'Seu Gmail foi desconectado deste workspace.');
+    }
+
+    public function syncGmail(Request $request, GmailEmailImportService $import): RedirectResponse
+    {
+        $result = $import->syncUser(
+            (int) $request->attributes->get('workspace_id'),
+            $request->user()->id,
+            (int) config('financial.integrations.gmail.sync_limit', 25),
+        );
+
+        if (! empty($result['error'])) {
+            return back()->with('error', 'Falha ao sincronizar Gmail: '.$result['error']);
+        }
+
+        return back()->with(
+            'success',
+            "Gmail sincronizado: {$result['created']} transação(ões) criada(s), ".
+            "{$result['skipped']} ignorada(s), {$result['scanned']} e-mail(s) lido(s)."
+        );
     }
 
     public function update(Request $request): RedirectResponse
@@ -130,8 +208,14 @@ class IntegrationSettingsController extends Controller
             return back()->with('warning', 'Informe para onde enviar no Telegram (@seu_usuario ou chat numérico) e o token do bot.');
         }
 
-        $result = app(TelegramService::class)->sendWithConfig($config,
-            '✅ Teste Financial IQ — Telegram configurado com sucesso!');
+        try {
+            $result = app(TelegramService::class)->sendWithConfig($config,
+                '✅ Teste Financial IQ — Telegram configurado com sucesso!');
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->with('error', 'Falha inesperada ao testar Telegram: '.$e->getMessage());
+        }
 
         if (! empty($result['chat_id'])) {
             $this->persistTelegramChatId($request->user(), $result['chat_id']);

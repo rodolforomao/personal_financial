@@ -26,6 +26,31 @@
         opacity: 1;
         pointer-events: auto;
     }
+
+    .dashboard-summary .small-box {
+        overflow: hidden;
+        position: relative;
+    }
+
+    .dashboard-summary .inner {
+        padding-right: 4.75rem;
+    }
+
+    .dashboard-summary .small-box-icon {
+        align-items: center;
+        display: flex;
+        font-size: 3rem;
+        height: 3.5rem;
+        justify-content: center;
+        line-height: 1;
+        opacity: .28;
+        pointer-events: none;
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3.5rem;
+    }
 </style>
 @endpush
 
@@ -127,14 +152,14 @@
     <a href="{{ route('clt-salaries.index') }}" class="btn btn-warning btn-sm">Confirmar agora</a>
 </div>
 @endif
-<div class="row">
+<div class="row g-3 mb-3 dashboard-summary">
     <div class="col-lg-3 col-6">
         <div class="small-box text-bg-success">
             <div class="inner">
                 <h3 class="sensitive-value" data-sensitive-value="{{ $sensitiveMoney($cashFlow['current_month']->total_income) }}">{{ $moneyMask }}</h3>
                 <p>Receitas (mês)</p>
             </div>
-            <div class="icon"><i class="bi bi-arrow-down-circle"></i></div>
+            <i class="small-box-icon bi bi-arrow-down-circle"></i>
         </div>
     </div>
     <div class="col-lg-3 col-6">
@@ -143,7 +168,7 @@
                 <h3 class="sensitive-value" data-sensitive-value="{{ $sensitiveMoney($cashFlow['current_month']->total_expense) }}">{{ $moneyMask }}</h3>
                 <p>Despesas (mês)</p>
             </div>
-            <div class="icon"><i class="bi bi-arrow-up-circle"></i></div>
+            <i class="small-box-icon bi bi-arrow-up-circle"></i>
         </div>
     </div>
     <div class="col-lg-3 col-6">
@@ -152,7 +177,7 @@
                 <h3 class="sensitive-value" data-sensitive-value="{{ $sensitiveMoney($cashFlow['current_month']->net_cash_flow) }}">{{ $moneyMask }}</h3>
                 <p>Fluxo líquido</p>
             </div>
-            <div class="icon"><i class="bi bi-graph-up"></i></div>
+            <i class="small-box-icon bi bi-graph-up"></i>
         </div>
     </div>
     <div class="col-lg-3 col-6">
@@ -161,7 +186,7 @@
                 <h3 class="sensitive-value" data-sensitive-value="{{ $sensitiveMoney($patrimony) }}">{{ $moneyMask }}</h3>
                 <p>Patrimônio</p>
             </div>
-            <div class="icon"><i class="bi bi-bank"></i></div>
+            <i class="small-box-icon bi bi-bank"></i>
         </div>
     </div>
 </div>

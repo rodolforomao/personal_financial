@@ -19,3 +19,11 @@ if (config('financial.integrations.telegram.scheduled_queue', false)) {
         ->withoutOverlapping(2)
         ->name('telegram-queue-drain');
 }
+
+if (config('financial.integrations.gmail.scheduled_sync', false)) {
+    $limit = (int) config('financial.integrations.gmail.sync_limit', 25);
+    Schedule::command("gmail:sync --limit={$limit}")
+        ->everyFifteenMinutes()
+        ->withoutOverlapping(10)
+        ->name('gmail-sync');
+}

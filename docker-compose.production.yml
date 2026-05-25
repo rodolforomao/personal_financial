@@ -1,7 +1,7 @@
 # Evolution API no VPS (Laravel nativo no Hestia + MariaDB do host).
 # Uso no servidor: docker compose -f docker-compose.production.yml --env-file .env up -d
 #
-# network_mode: host → Evolution usa 127.0.0.1:3306 (MariaDB Hestia) e escuta na porta 8081.
+# network_mode: host → Evolution usa 127.0.0.1:3306 (MariaDB Hestia) e escuta na porta 8085.
 services:
   evolution-api:
     image: atendai/evolution-api:homolog
