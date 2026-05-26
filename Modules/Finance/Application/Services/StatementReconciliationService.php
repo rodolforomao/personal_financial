@@ -85,11 +85,12 @@ class StatementReconciliationService
             categoryId: $defaults['category_id'],
             fundingSource: $defaults['funding_source'],
             paymentMethod: $defaults['payment_method'],
-            source: $line->import->format,
+            source: 'statement_import',
             metadata: [
                 'statement_line_id' => $line->id,
                 'statement_import_id' => $line->statement_import_id,
                 'external_ref' => $line->external_ref,
+                'statement_format' => $line->import->format,
             ],
         ));
 
