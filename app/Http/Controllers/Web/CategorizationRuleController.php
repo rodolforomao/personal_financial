@@ -7,12 +7,15 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Modules\Categorization\Application\Services\BulkCategorizeTransactionsService;
+use Modules\Categorization\Application\Services\SharedCategorizationRuleSuggestionService;
 use Modules\Categorization\Infrastructure\Models\Category;
 use Modules\Categorization\Infrastructure\Models\CategorizationRule;
+use Modules\Categorization\Infrastructure\Models\CategorizationRuleAssignment;
 
 class CategorizationRuleController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, SharedCategorizationRuleSuggestionService $sharedSuggestions): View
     {
         $workspaceId = (int) $request->attributes->get('workspace_id');
 
@@ -39,13 +42,20 @@ class CategorizationRuleController extends Controller
 
         return view('categorization-rules.index', [
             'rules' => $rules,
+            'sharedAssignments' => CategorizationRuleAssignment::query()
+                ->where('workspace_id', $workspaceId)
+                ->with(['rule.category', 'category'])
+                ->orderBy('priority')
+                ->orderBy('id')
+                ->get(),
+            'sharedSuggestions' => $sharedSuggestions->forWorkspace($workspaceId),
             'categories' => $categories,
             'matchTypes' => $this->matchTypes(),
             'suggestedNames' => $suggestedNames,
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, BulkCategorizeTransactionsService $bulkCategorize): RedirectResponse
     {
         $workspaceId = (int) $request->attributes->get('workspace_id');
         $validated = $this->validateBulkCreate($request);
@@ -54,6 +64,7 @@ class CategorizationRuleController extends Controller
 
         $created = 0;
         $updated = 0;
+        $ruleIds = [];
 
         foreach ($validated['names'] as $name) {
             $name = trim($name);
@@ -83,6 +94,8 @@ class CategorizationRuleController extends Controller
             } else {
                 $updated++;
             }
+
+            $ruleIds[] = $rule->id;
         }
 
         $total = $created + $updated;
@@ -97,10 +110,21 @@ class CategorizationRuleController extends Controller
             $message .= ($message ? ' ' : '')."{$updated} regra(s) atualizada(s) (padrão já existia).";
         }
 
+        if ($request->boolean('is_active', true)) {
+            $result = $bulkCategorize->runForRules($workspaceId, $ruleIds);
+            if ($result['categorized'] > 0) {
+                $message .= ($message ? ' ' : '')."{$result['categorized']} transação(ões) sem categoria atualizada(s).";
+            }
+        }
+
         return back()->with('success', trim($message));
     }
 
-    public function update(Request $request, CategorizationRule $categorizationRule): RedirectResponse
+    public function update(
+        Request $request,
+        CategorizationRule $categorizationRule,
+        BulkCategorizeTransactionsService $bulkCategorize,
+    ): RedirectResponse
     {
         $workspaceId = (int) $request->attributes->get('workspace_id');
         $this->assertRuleInWorkspace($categorizationRule, $workspaceId);
@@ -113,7 +137,15 @@ class CategorizationRuleController extends Controller
             'is_active' => $request->boolean('is_active'),
         ]);
 
-        return back()->with('success', 'Regra atualizada.');
+        $message = 'Regra atualizada.';
+        if ($categorizationRule->is_active) {
+            $result = $bulkCategorize->runForRules($workspaceId, [$categorizationRule->id]);
+            if ($result['categorized'] > 0) {
+                $message .= " {$result['categorized']} transação(ões) sem categoria atualizada(s).";
+            }
+        }
+
+        return back()->with('success', $message);
     }
 
     public function destroy(Request $request, CategorizationRule $categorizationRule): RedirectResponse
@@ -124,12 +156,67 @@ class CategorizationRuleController extends Controller
         return back()->with('success', 'Regra removida.');
     }
 
-    public function toggle(Request $request, CategorizationRule $categorizationRule): RedirectResponse
+    public function toggle(
+        Request $request,
+        CategorizationRule $categorizationRule,
+        BulkCategorizeTransactionsService $bulkCategorize,
+    ): RedirectResponse
     {
-        $this->assertRuleInWorkspace($categorizationRule, (int) $request->attributes->get('workspace_id'));
+        $workspaceId = (int) $request->attributes->get('workspace_id');
+        $this->assertRuleInWorkspace($categorizationRule, $workspaceId);
         $categorizationRule->update(['is_active' => ! $categorizationRule->is_active]);
 
-        return back()->with('success', $categorizationRule->is_active ? 'Regra ativada.' : 'Regra desativada.');
+        $message = $categorizationRule->is_active ? 'Regra ativada.' : 'Regra desativada.';
+        if ($categorizationRule->is_active) {
+            $result = $bulkCategorize->runForRules($workspaceId, [$categorizationRule->id]);
+            if ($result['categorized'] > 0) {
+                $message .= " {$result['categorized']} transação(ões) sem categoria atualizada(s).";
+            }
+        }
+
+        return back()->with('success', $message);
+    }
+
+    public function acceptShared(
+        Request $request,
+        CategorizationRule $categorizationRule,
+        BulkCategorizeTransactionsService $bulkCategorize,
+    ): RedirectResponse {
+        $workspaceId = (int) $request->attributes->get('workspace_id');
+        abort_if($categorizationRule->workspace_id === $workspaceId, 404);
+
+        $validated = $request->validate([
+            'category_id' => 'required|exists:categories,id',
+            'priority' => 'nullable|integer|min:1|max:9999',
+        ]);
+        $this->assertCategoryInWorkspace($workspaceId, (int) $validated['category_id']);
+
+        if ($this->workspaceHasEquivalentRule($workspaceId, $categorizationRule)) {
+            return back()->with('info', 'Este workspace já possui uma regra equivalente.');
+        }
+
+        $assignment = CategorizationRuleAssignment::query()->firstOrCreate(
+            [
+                'workspace_id' => $workspaceId,
+                'categorization_rule_id' => $categorizationRule->id,
+            ],
+            [
+                'category_id' => $validated['category_id'],
+                'priority' => (int) ($validated['priority'] ?? $categorizationRule->priority),
+                'is_active' => true,
+            ],
+        );
+
+        $result = $bulkCategorize->runForRules($workspaceId, [$categorizationRule->id]);
+        $message = $assignment->wasRecentlyCreated
+            ? 'Regra compartilhada vinculada.'
+            : 'Regra compartilhada já estava vinculada.';
+
+        if ($result['categorized'] > 0) {
+            $message .= " {$result['categorized']} transação(ões) sem categoria atualizada(s).";
+        }
+
+        return back()->with('success', $message);
     }
 
     /**
@@ -202,5 +289,15 @@ class CategorizationRuleController extends Controller
             422,
             'Categoria inválida para este workspace.'
         );
+    }
+
+    protected function workspaceHasEquivalentRule(int $workspaceId, CategorizationRule $sharedRule): bool
+    {
+        return CategorizationRule::query()
+            ->where('workspace_id', $workspaceId)
+            ->where('match_type', $sharedRule->match_type)
+            ->where('pattern', $sharedRule->pattern)
+            ->where('transaction_type', $sharedRule->transaction_type)
+            ->exists();
     }
 }

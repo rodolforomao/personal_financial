@@ -37,4 +37,9 @@ class Category extends Model
     {
         return $this->hasMany(CategorizationRule::class);
     }
+
+    public function ruleAssignments(): HasMany
+    {
+        return $this->hasMany(CategorizationRuleAssignment::class);
+    }
 }

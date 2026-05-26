@@ -15,6 +15,34 @@ class BulkCategorizeTransactionsService
      */
     public function run(int $workspaceId): array
     {
+        return $this->categorize($workspaceId);
+    }
+
+    /**
+     * @param  array<int>  $ruleIds
+     * @return array{categorized: int, unchanged: int, total: int}
+     */
+    public function runForRules(int $workspaceId, array $ruleIds): array
+    {
+        $ruleIds = array_values(array_unique(array_filter($ruleIds)));
+
+        if ($ruleIds === []) {
+            return [
+                'categorized' => 0,
+                'unchanged' => 0,
+                'total' => 0,
+            ];
+        }
+
+        return $this->categorize($workspaceId, $ruleIds);
+    }
+
+    /**
+     * @param  array<int>|null  $onlyRuleIds
+     * @return array{categorized: int, unchanged: int, total: int}
+     */
+    protected function categorize(int $workspaceId, ?array $onlyRuleIds = null): array
+    {
         $categorized = 0;
         $unchanged = 0;
 
@@ -25,13 +53,21 @@ class BulkCategorizeTransactionsService
 
         $total = (clone $query)->count();
 
-        $query->each(function (Transaction $transaction) use ($workspaceId, &$categorized, &$unchanged) {
-            $suggestion = $this->categorization->suggest(
-                $workspaceId,
-                $transaction->description,
-                $transaction->counterparty,
-                $transaction->type,
-            );
+        $query->each(function (Transaction $transaction) use ($workspaceId, $onlyRuleIds, &$categorized, &$unchanged) {
+            $suggestion = $onlyRuleIds === null
+                ? $this->categorization->suggest(
+                    $workspaceId,
+                    $transaction->description,
+                    $transaction->counterparty,
+                    $transaction->type,
+                )
+                : $this->categorization->suggestFromRules(
+                    $workspaceId,
+                    $transaction->description,
+                    $transaction->counterparty,
+                    $transaction->type,
+                    $onlyRuleIds,
+                );
 
             if (! $suggestion || empty($suggestion['category_id'])) {
                 $unchanged++;

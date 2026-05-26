@@ -23,10 +23,13 @@ class CategorizationRuleTypeTest extends TestCase
 
     public function test_evento_b3_rule_applies_only_to_income(): void
     {
-        $dividendos = Category::query()
-            ->where('workspace_id', $this->workspace->id)
-            ->where('slug', 'dividendos')
-            ->firstOrFail();
+        $dividendos = Category::query()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Dividendos',
+            'slug' => 'dividendos',
+            'type' => 'income',
+            'is_system' => true,
+        ]);
 
         CategorizationRule::query()->create([
             'workspace_id' => $this->workspace->id,
@@ -38,6 +41,8 @@ class CategorizationRuleTypeTest extends TestCase
             'priority' => 10,
             'is_active' => true,
         ]);
+
+        config(['financial.default_categorization_patterns' => []]);
 
         $service = app(CategorizationService::class);
 

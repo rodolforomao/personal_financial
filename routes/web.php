@@ -59,6 +59,7 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
 
         Route::get('categorization-rules', [CategorizationRuleController::class, 'index'])->name('categorization-rules.index');
         Route::post('categorization-rules', [CategorizationRuleController::class, 'store'])->name('categorization-rules.store');
+        Route::post('categorization-rules/shared/{categorizationRule}/accept', [CategorizationRuleController::class, 'acceptShared'])->name('categorization-rules.shared.accept');
         Route::put('categorization-rules/{categorizationRule}', [CategorizationRuleController::class, 'update'])->name('categorization-rules.update');
         Route::patch('categorization-rules/{categorizationRule}/toggle', [CategorizationRuleController::class, 'toggle'])->name('categorization-rules.toggle');
         Route::delete('categorization-rules/{categorizationRule}', [CategorizationRuleController::class, 'destroy'])->name('categorization-rules.destroy');

@@ -7,6 +7,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Modules\Categorization\Application\Services\SharedCategorizationRuleSuggestionService;
 use Modules\Finance\Application\Services\StatementImportWorkflowService;
 use Modules\Finance\Application\Services\StatementNettedPairService;
 use Modules\Finance\Application\Services\StatementReconciliationService;
@@ -166,11 +167,18 @@ class StatementImportController extends Controller
         StatementImport $statementImport,
         StatementLine $line,
         StatementReconciliationService $reconciliation,
+        SharedCategorizationRuleSuggestionService $sharedRules,
     ): RedirectResponse {
         $this->authorizeLine($request, $statementImport, $line);
         $tx = $reconciliation->importAsTransaction($line, $statementImport->workspace_id);
 
-        return back()->with('success', "Transação #{$tx->id} criada e conciliada.");
+        $message = "Transação #{$tx->id} criada e conciliada.";
+        $sharedCount = $sharedRules->forWorkspace($statementImport->workspace_id, 1)->count();
+        if ($sharedCount > 0) {
+            $message .= ' Há regras compartilhadas disponíveis para transações sem categoria.';
+        }
+
+        return back()->with('success', $message);
     }
 
     public function skipLine(
@@ -204,6 +212,7 @@ class StatementImportController extends Controller
         Request $request,
         StatementImport $statementImport,
         StatementReconciliationService $reconciliation,
+        SharedCategorizationRuleSuggestionService $sharedRules,
     ): RedirectResponse {
         abort_unless(
             $statementImport->workspace_id === (int) $request->attributes->get('workspace_id'),
@@ -211,8 +220,13 @@ class StatementImportController extends Controller
         );
 
         $count = $reconciliation->importAllUnmatched($statementImport);
+        $message = "{$count} transação(ões) criada(s) a partir do extrato.";
+        $sharedCount = $sharedRules->forWorkspace($statementImport->workspace_id, 1)->count();
+        if ($sharedCount > 0) {
+            $message .= ' Há regras compartilhadas disponíveis em Auto categorização.';
+        }
 
-        return back()->with('success', "{$count} transação(ões) criada(s) a partir do extrato.");
+        return back()->with('success', $message);
     }
 
     protected function authorizeLine(Request $request, StatementImport $import, StatementLine $line): void

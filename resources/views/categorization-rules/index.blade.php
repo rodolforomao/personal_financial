@@ -92,6 +92,106 @@
         </div>
     </div>
     <div class="col-lg-8">
+        @if($sharedSuggestions->isNotEmpty())
+            <div class="card card-outline card-success">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Regras sugeridas de outros workspaces</h3>
+                </div>
+                <div class="card-body table-responsive p-0">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Regra</th>
+                                <th>Categoria local</th>
+                                <th class="text-center">Matches</th>
+                                <th>Exemplo</th>
+                                <th class="text-end">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($sharedSuggestions as $suggestion)
+                                @php($rule = $suggestion['rule'])
+                                <tr>
+                                    <td>
+                                        <span class="badge text-bg-secondary">{{ $matchTypes[$rule->match_type] ?? $rule->match_type }}</span>
+                                        <code class="ms-1">{{ $rule->pattern }}</code>
+                                        @if($rule->transaction_type)
+                                            <span class="badge text-bg-light ms-1">{{ $rule->transaction_type }}</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <form id="accept-shared-rule-{{ $rule->id }}" action="{{ route('categorization-rules.shared.accept', $rule) }}" method="POST" class="d-flex gap-2">
+                                            @csrf
+                                            <input type="hidden" name="priority" value="{{ $rule->priority }}">
+                                            <select name="category_id" class="form-select form-select-sm" required>
+                                                <option value="">— Selecione —</option>
+                                                @foreach($categories as $cat)
+                                                    <option value="{{ $cat->id }}" @selected(optional($suggestion['suggested_category'])->id === $cat->id)>
+                                                        {{ $cat->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </form>
+                                    </td>
+                                    <td class="text-center">{{ $suggestion['matches_count'] }}</td>
+                                    <td class="text-muted">{{ Str::limit($suggestion['sample_description'], 42) }}</td>
+                                    <td class="text-end">
+                                        <button type="submit" form="accept-shared-rule-{{ $rule->id }}" class="btn btn-sm btn-success">
+                                            Reutilizar
+                                        </button>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer small text-muted">
+                    Ao reutilizar, o workspace cria apenas um vínculo com a regra existente e escolhe a categoria local.
+                </div>
+            </div>
+        @endif
+
+        @if($sharedAssignments->isNotEmpty())
+            <div class="card card-outline card-secondary">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Regras reutilizadas</h3>
+                </div>
+                <div class="card-body table-responsive p-0">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Padrão</th>
+                                <th>Categoria local</th>
+                                <th class="text-center">Usos</th>
+                                <th class="text-center">Ativa</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($sharedAssignments as $assignment)
+                                <tr>
+                                    <td>
+                                        <span class="badge text-bg-secondary">{{ $matchTypes[$assignment->rule->match_type] ?? $assignment->rule->match_type }}</span>
+                                        <code class="ms-1">{{ $assignment->rule->pattern }}</code>
+                                    </td>
+                                    <td>
+                                        <span class="badge rounded-pill text-bg-secondary">
+                                            {{ $assignment->category->name }}
+                                        </span>
+                                    </td>
+                                    <td class="text-center">{{ $assignment->hit_count }}</td>
+                                    <td class="text-center">
+                                        <span class="badge text-bg-{{ $assignment->is_active ? 'success' : 'secondary' }}">
+                                            {{ $assignment->is_active ? 'Sim' : 'Não' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
+
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title mb-0">Regras cadastradas</h3>
@@ -123,7 +223,7 @@
                                 </td>
                                 <td>
                                     @if($rule->category)
-                                        <span class="badge rounded-pill" style="background:{{ $rule->category->color ?? '#6c757d' }}">
+                                        <span class="badge rounded-pill text-bg-secondary">
                                             {{ $rule->category->name }}
                                         </span>
                                     @else

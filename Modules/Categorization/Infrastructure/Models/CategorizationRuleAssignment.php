@@ -4,19 +4,22 @@ namespace Modules\Categorization\Infrastructure\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Infrastructure\Models\Workspace;
 
-class CategorizationRule extends Model
+class CategorizationRuleAssignment extends Model
 {
     protected $fillable = [
-        'workspace_id', 'category_id', 'name', 'match_type', 'pattern',
-        'transaction_type', 'priority', 'is_active', 'hit_count',
+        'categorization_rule_id', 'workspace_id', 'category_id', 'priority', 'is_active', 'hit_count',
     ];
 
     protected function casts(): array
     {
         return ['is_active' => 'boolean'];
+    }
+
+    public function rule(): BelongsTo
+    {
+        return $this->belongsTo(CategorizationRule::class, 'categorization_rule_id');
     }
 
     public function workspace(): BelongsTo
@@ -27,10 +30,5 @@ class CategorizationRule extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
-    }
-
-    public function assignments(): HasMany
-    {
-        return $this->hasMany(CategorizationRuleAssignment::class);
     }
 }

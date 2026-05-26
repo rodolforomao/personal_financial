@@ -23,10 +23,13 @@ class ReceiptCategorySuggestionTest extends TestCase
 
     public function test_suggests_category_from_rule_for_uber(): void
     {
-        $transport = Category::query()
-            ->where('workspace_id', $this->workspace->id)
-            ->where('slug', 'transporte')
-            ->firstOrFail();
+        $transport = Category::query()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Transporte',
+            'slug' => 'transporte',
+            'type' => 'expense',
+            'is_system' => true,
+        ]);
 
         CategorizationRule::query()->create([
             'workspace_id' => $this->workspace->id,
