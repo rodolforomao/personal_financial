@@ -3,13 +3,13 @@
 namespace Tests\Feature\Phase1;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Modules\Finance\Application\Services\StatementAttachmentImportService;
+use Modules\Finance\Application\Services\StatementImportWorkflowService;
 use Modules\Finance\Infrastructure\Models\StatementImport;
 use Modules\Finance\Infrastructure\Models\Transaction;
 use Tests\Concerns\SeedsFinancialWorkspace;
 use Tests\TestCase;
 
-class StatementAttachmentImportTest extends TestCase
+class StatementImportWorkflowTest extends TestCase
 {
     use RefreshDatabase;
     use SeedsFinancialWorkspace;
@@ -22,7 +22,7 @@ class StatementAttachmentImportTest extends TestCase
 
     public function test_ofx_attachment_imports_transactions_and_returns_review_links(): void
     {
-        $result = app(StatementAttachmentImportService::class)->importAttachment(
+        $result = app(StatementImportWorkflowService::class)->importAttachmentAndCreateTransactions(
             $this->workspace->id,
             $this->user,
             base_path('tests/fixtures/sample.ofx'),
@@ -53,7 +53,7 @@ class StatementAttachmentImportTest extends TestCase
         file_put_contents($path, "Data,Valor,Descricao\n2026-05-20,-15.50,Cafe\n");
 
         try {
-            $result = app(StatementAttachmentImportService::class)->importAttachment(
+            $result = app(StatementImportWorkflowService::class)->importAttachmentAndCreateTransactions(
                 $this->workspace->id,
                 $this->user,
                 $path,

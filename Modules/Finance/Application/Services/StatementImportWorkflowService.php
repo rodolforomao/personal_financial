@@ -7,14 +7,86 @@ use Illuminate\Support\Str;
 use Modules\Finance\Infrastructure\Models\StatementImport;
 use Modules\Finance\Infrastructure\Models\StatementLine;
 
-class StatementAttachmentImportService
+class StatementImportWorkflowService
 {
     public function __construct(
         protected StatementImportService $imports,
         protected StatementReconciliationService $reconciliation,
     ) {}
 
+    public function parseOfxForReview(
+        int $workspaceId,
+        ?User $user,
+        string $filePath,
+        string $originalName,
+        ?string $bankSlug = null,
+    ): StatementImport {
+        return $this->imports->parseOfx($workspaceId, $user, $filePath, $originalName, $bankSlug);
+    }
+
     /**
+     * @param  array{amount: string, date: string, description?: string, counterparty?: string}  $mapping
+     */
+    public function parseCsvForReview(
+        int $workspaceId,
+        ?User $user,
+        string $filePath,
+        string $originalName,
+        array $mapping,
+    ): StatementImport {
+        return $this->imports->parseCsv($workspaceId, $user, $filePath, $originalName, $mapping);
+    }
+
+    /**
+     * @return array{import: StatementImport, imported_count: int}
+     */
+    public function importOfxAndCreateTransactions(
+        int $workspaceId,
+        ?User $user,
+        string $filePath,
+        string $originalName,
+        ?string $bankSlug = null,
+    ): array {
+        $import = $this->parseOfxForReview($workspaceId, $user, $filePath, $originalName, $bankSlug);
+        $count = $this->reconciliation->importAllUnmatched($import);
+
+        return [
+            'import' => $import->fresh(),
+            'imported_count' => $count,
+        ];
+    }
+
+    /**
+     * @param  array{amount: string, date: string, description?: string, counterparty?: string}  $mapping
+     * @return array{import: StatementImport, imported_count: int}
+     */
+    public function importCsvAndCreateTransactions(
+        int $workspaceId,
+        ?User $user,
+        string $filePath,
+        string $originalName,
+        array $mapping,
+    ): array {
+        $import = $this->parseCsvForReview($workspaceId, $user, $filePath, $originalName, $mapping);
+        $count = $this->reconciliation->importAllUnmatched($import);
+
+        return [
+            'import' => $import->fresh(),
+            'imported_count' => $count,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function readCsvHeaders(string $filePath): array
+    {
+        return $this->imports->readCsvHeaders($filePath);
+    }
+
+    /**
+     * Used by Telegram/WhatsApp after the channel has downloaded the media.
+     *
      * @return array{
      *     handled: bool,
      *     import?: StatementImport,
@@ -26,14 +98,14 @@ class StatementAttachmentImportService
      *     headers?: list<string>
      * }
      */
-    public function importAttachment(
+    public function importAttachmentAndCreateTransactions(
         int $workspaceId,
         User $user,
         string $filePath,
         ?string $originalName = null,
         ?string $mime = null,
     ): array {
-        $format = $this->detectFormat($filePath, $originalName, $mime);
+        $format = $this->detectAttachmentFormat($filePath, $originalName, $mime);
         if ($format === null) {
             return ['handled' => false];
         }
@@ -44,11 +116,11 @@ class StatementAttachmentImportService
                 return [
                     'handled' => true,
                     'error' => 'csv_mapping_required',
-                    'headers' => $this->imports->readCsvHeaders($filePath),
+                    'headers' => $this->readCsvHeaders($filePath),
                 ];
             }
 
-            $import = $this->imports->parseCsv(
+            $import = $this->parseCsvForReview(
                 $workspaceId,
                 $user,
                 $filePath,
@@ -56,7 +128,7 @@ class StatementAttachmentImportService
                 $mapping,
             );
         } else {
-            $import = $this->imports->parseOfx(
+            $import = $this->parseOfxForReview(
                 $workspaceId,
                 $user,
                 $filePath,
@@ -73,6 +145,56 @@ class StatementAttachmentImportService
             'import' => $import,
             'imported_count' => $created,
             'suggested_count' => $suggested,
+            ...$this->reviewUrls($import),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    public function channelReply(array $result, string $channel): string
+    {
+        if (($result['error'] ?? null) === 'csv_mapping_required') {
+            $headers = implode(', ', array_slice($result['headers'] ?? [], 0, 8));
+
+            return "Recebi o CSV, mas não consegui identificar automaticamente as colunas de data e valor.\n".
+                "Colunas encontradas: {$headers}\n".
+                'Importe esse CSV pela tela de extratos para mapear as colunas: '.route('statements.index');
+        }
+
+        $import = $result['import'] ?? null;
+        $total = $import?->lines_total ?? 0;
+        $created = (int) ($result['imported_count'] ?? 0);
+        $suggested = (int) ($result['suggested_count'] ?? 0);
+        $netted = $import?->netted_count ?? 0;
+
+        $parts = [
+            "✅ Extrato importado pelo {$channel}.\n".
+            "Linhas: {$total} | Transações criadas: {$created}",
+        ];
+
+        if ($suggested > 0) {
+            $parts[] = "Sugestões de conciliação para revisar: {$suggested}";
+        }
+
+        if ($netted > 0) {
+            $parts[] = "Estornos ocultados: {$netted}";
+        }
+
+        $parts[] = 'Revisar conciliação: '.$result['review_url'];
+        if ($created > 0) {
+            $parts[] = 'Editar importadas em massa: '.$result['bulk_url'];
+        }
+
+        return implode("\n", $parts);
+    }
+
+    /**
+     * @return array{review_url: string, bulk_url: string}
+     */
+    public function reviewUrls(StatementImport $import): array
+    {
+        return [
             'review_url' => route('statements.reconcile', $import),
             'bulk_url' => route('transactions.index', [
                 'statement_import_id' => $import->id,
@@ -81,7 +203,7 @@ class StatementAttachmentImportService
         ];
     }
 
-    protected function detectFormat(string $filePath, ?string $originalName, ?string $mime): ?string
+    protected function detectAttachmentFormat(string $filePath, ?string $originalName, ?string $mime): ?string
     {
         $name = Str::lower((string) $originalName);
         $mime = Str::lower((string) $mime);
@@ -113,7 +235,7 @@ class StatementAttachmentImportService
      */
     protected function guessCsvMapping(string $filePath): ?array
     {
-        $headers = $this->imports->readCsvHeaders($filePath);
+        $headers = $this->readCsvHeaders($filePath);
         $amount = $this->findHeader($headers, ['valor', 'amount', 'vlr', 'value']);
         $date = $this->findHeader($headers, ['data', 'date', 'dt']);
 

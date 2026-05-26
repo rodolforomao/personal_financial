@@ -1,8 +1,8 @@
 <?php
 
 return [
-    'app_name' => env('APP_NAME', 'Financial Intelligence'),
-    'logo' => '<b>Financial</b>IQ',
+    'app_name' => env('APP_NAME', 'FinancialIQ'),
+    'logo' => '<b>Financial</b><span>IQ</span>',
 
     // Fallback se a tabela navigation_menu_items estiver vazia (ordem oficial: NavigationMenuSeeder).
     'menu' => [

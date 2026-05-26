@@ -19,23 +19,6 @@ class StatementImportService
         protected StatementNettedPairService $nettedPairs,
     ) {}
 
-    /**
-     * Importação rápida (API legado): cria transações direto.
-     */
-    public function importOfx(int $workspaceId, string $filePath): int
-    {
-        $import = $this->parseOfx($workspaceId, null, $filePath, basename($filePath));
-
-        return $this->reconciliation->importAllUnmatched($import);
-    }
-
-    public function importCsv(int $workspaceId, string $filePath, array $mapping): int
-    {
-        $import = $this->parseCsv($workspaceId, null, $filePath, basename($filePath), $mapping);
-
-        return $this->reconciliation->importAllUnmatched($import);
-    }
-
     public function parseOfx(
         int $workspaceId,
         ?User $user,

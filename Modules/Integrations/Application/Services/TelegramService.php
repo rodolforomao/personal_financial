@@ -323,6 +323,9 @@ class TelegramService
             'webp' => 'image/webp',
             'pdf' => 'application/pdf',
             'xml' => 'application/xml',
+            'ofx', 'qfx' => 'application/x-ofx',
+            'csv' => 'text/csv',
+            'txt' => 'text/plain',
             default => 'image/jpeg',
         };
 
@@ -339,6 +342,11 @@ class TelegramService
 
         if (str_starts_with($prefix, '<?xml') || str_contains($prefix, '<nfeProc')) {
             return 'xml';
+        }
+
+        $lower = strtolower($prefix);
+        if (str_contains($lower, '<ofx') || str_contains($lower, '<stmttrn>')) {
+            return 'ofx';
         }
 
         return 'jpg';

@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Modules\Finance\Application\Actions\CreateTransactionAction;
 use Modules\Finance\Application\DTOs\CreateTransactionData;
+use Modules\Finance\Application\Services\StatementImportWorkflowService;
 use Modules\Finance\Application\Services\TransactionDeduplicationService;
 
 class TelegramInboundService
@@ -24,6 +25,7 @@ class TelegramInboundService
         protected ReceiptConfirmationService $receiptConfirmation,
         protected TelegramBackgroundCommandService $backgroundCommands,
         protected PlatformOperationsGuide $operationsGuide,
+        protected StatementImportWorkflowService $statementImports,
     ) {}
 
     /**
@@ -137,6 +139,22 @@ class TelegramInboundService
 
             $caption = trim((string) ($message['caption'] ?? ''));
             $fileName = (string) ($message['document']['file_name'] ?? '');
+            $statementImport = $this->statementImports->importAttachmentAndCreateTransactions(
+                $workspaceId,
+                $user,
+                $download['path'],
+                $fileName !== '' ? $fileName : null,
+                $download['mime'] ?? null,
+            );
+            if ($statementImport['handled']) {
+                $this->reply($chatId, $this->statementImports->channelReply($statementImport, 'Telegram'), $token);
+                if (isset($download['path']) && is_file($download['path'])) {
+                    @unlink($download['path']);
+                }
+
+                return ['handled' => true, 'reply' => 'statement_import'];
+            }
+
             $this->reply($chatId, '⏳ Lendo comprovante...', $token);
             $flow = $this->receiptFlow->handleMedia(
                 $user,
@@ -438,8 +456,15 @@ class TelegramInboundService
             $fileName = strtolower((string) ($document['file_name'] ?? ''));
             if (str_starts_with($mime, 'image/')
                 || $mime === 'application/pdf'
+                || str_contains($mime, 'ofx')
+                || str_contains($mime, 'csv')
+                || str_contains($mime, 'text/plain')
                 || str_contains($mime, 'xml')
                 || str_ends_with($fileName, '.pdf')
+                || str_ends_with($fileName, '.ofx')
+                || str_ends_with($fileName, '.qfx')
+                || str_ends_with($fileName, '.csv')
+                || str_ends_with($fileName, '.txt')
                 || str_ends_with($fileName, '.xml')
                 || $mime === ''
                 || $mime === 'application/octet-stream') {

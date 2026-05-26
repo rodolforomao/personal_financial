@@ -2,9 +2,15 @@
     $menuItems = $sidebarMenu ?? config('adminlte.menu', []);
 @endphp
 <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
-    <div class="sidebar-brand">
-        <a href="{{ route('dashboard') }}" class="brand-link">
-            <span class="brand-text fw-light ms-2">{!! config('adminlte.logo') !!}</span>
+    <div class="sidebar-brand fiq-sidebar-brand">
+        <a href="{{ route('dashboard') }}" class="brand-link fiq-brand-link">
+            @if(file_exists(public_path('financialiq/logo_transparent.png')))
+                <img src="{{ asset('financialiq/logo_transparent.png') }}" alt="FinancialIQ" class="fiq-brand-logo">
+            @endif
+            <span class="fiq-brand-wordmark">
+                Financial<span>IQ</span>
+                <small class="fiq-brand-subtitle">CFO Intelligence</small>
+            </span>
         </a>
     </div>
     <div class="sidebar-wrapper">

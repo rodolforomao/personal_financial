@@ -7,7 +7,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
-use Modules\Finance\Application\Services\StatementImportService;
+use Modules\Finance\Application\Services\StatementImportWorkflowService;
 use Modules\Finance\Application\Services\StatementNettedPairService;
 use Modules\Finance\Application\Services\StatementReconciliationService;
 use Modules\Finance\Infrastructure\Models\StatementImport;
@@ -28,7 +28,7 @@ class StatementImportController extends Controller
         ]);
     }
 
-    public function store(Request $request, StatementImportService $importService): RedirectResponse
+    public function store(Request $request, StatementImportWorkflowService $imports): RedirectResponse
     {
         $request->validate([
             'file' => 'required|file|mimes:ofx,csv,txt|max:20480',
@@ -44,7 +44,7 @@ class StatementImportController extends Controller
 
         try {
             if ($format === 'csv') {
-                $headers = $importService->readCsvHeaders($fullPath);
+                $headers = $imports->readCsvHeaders($fullPath);
                 session([
                     'csv_import_path' => $tmp,
                     'csv_import_name' => $file->getClientOriginalName(),
@@ -54,7 +54,7 @@ class StatementImportController extends Controller
                 return redirect()->route('statements.import.csv-map');
             }
 
-            $import = $importService->parseOfx(
+            $import = $imports->parseOfxForReview(
                 $workspaceId,
                 $request->user(),
                 $fullPath,
@@ -84,7 +84,7 @@ class StatementImportController extends Controller
         ]);
     }
 
-    public function csvImport(Request $request, StatementImportService $importService): RedirectResponse
+    public function csvImport(Request $request, StatementImportWorkflowService $imports): RedirectResponse
     {
         $path = session('csv_import_path');
         if (! $path) {
@@ -112,7 +112,7 @@ class StatementImportController extends Controller
         $workspaceId = (int) $request->attributes->get('workspace_id');
         $fullPath = Storage::disk('local')->path($path);
 
-        $import = $importService->parseCsv(
+        $import = $imports->parseCsvForReview(
             $workspaceId,
             $request->user(),
             $fullPath,
@@ -121,7 +121,7 @@ class StatementImportController extends Controller
         );
 
         Storage::disk('local')->delete($path);
-        session()->forget(['csv_import_path', 'csv_import_name', 'csv_headers']);
+        $request->session()->forget(['csv_import_path', 'csv_import_name', 'csv_headers']);
 
         return redirect()
             ->route('statements.reconcile', $import)

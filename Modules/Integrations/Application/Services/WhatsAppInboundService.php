@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Modules\Finance\Application\Actions\CreateTransactionAction;
 use Modules\Finance\Application\DTOs\CreateTransactionData;
-use Modules\Finance\Application\Services\StatementAttachmentImportService;
+use Modules\Finance\Application\Services\StatementImportWorkflowService;
 use Modules\Finance\Application\Services\TransactionDeduplicationService;
 
 class WhatsAppInboundService
@@ -23,7 +23,7 @@ class WhatsAppInboundService
         protected CreateTransactionAction $createTransaction,
         protected TransactionDeduplicationService $deduplication,
         protected WhatsAppSenderPhoneResolver $phoneResolver,
-        protected StatementAttachmentImportService $statementImports,
+        protected StatementImportWorkflowService $statementImports,
     ) {}
 
     /**
@@ -86,7 +86,7 @@ class WhatsAppInboundService
         }
 
         if ($parsed['media_path']) {
-            $statementImport = $this->statementImports->importAttachment(
+            $statementImport = $this->statementImports->importAttachmentAndCreateTransactions(
                 $workspaceId,
                 $user,
                 $parsed['media_path'],
@@ -94,7 +94,7 @@ class WhatsAppInboundService
                 $parsed['mime'] ?? null,
             );
             if ($statementImport['handled']) {
-                $this->reply($phone, $this->statementImportReply($statementImport));
+                $this->reply($phone, $this->statementImports->channelReply($statementImport, 'WhatsApp'));
                 if (is_file($parsed['media_path'])) {
                     @unlink($parsed['media_path']);
                 }
@@ -201,46 +201,6 @@ class WhatsAppInboundService
     protected function reply(string $phone, string $text): void
     {
         $this->whatsapp->send($phone, $text);
-    }
-
-    /**
-     * @param  array<string, mixed>  $result
-     */
-    protected function statementImportReply(array $result): string
-    {
-        if (($result['error'] ?? null) === 'csv_mapping_required') {
-            $headers = implode(', ', array_slice($result['headers'] ?? [], 0, 8));
-
-            return "Recebi o CSV, mas não consegui identificar automaticamente as colunas de data e valor.\n".
-                "Colunas encontradas: {$headers}\n".
-                'Importe esse CSV pela tela de extratos para mapear as colunas: '.route('statements.index');
-        }
-
-        $import = $result['import'] ?? null;
-        $total = $import?->lines_total ?? 0;
-        $created = (int) ($result['imported_count'] ?? 0);
-        $suggested = (int) ($result['suggested_count'] ?? 0);
-        $netted = $import?->netted_count ?? 0;
-
-        $parts = [
-            "✅ Extrato importado pelo WhatsApp.\n".
-            "Linhas: {$total} | Transações criadas: {$created}",
-        ];
-
-        if ($suggested > 0) {
-            $parts[] = "Sugestões de conciliação para revisar: {$suggested}";
-        }
-
-        if ($netted > 0) {
-            $parts[] = "Estornos ocultados: {$netted}";
-        }
-
-        $parts[] = 'Revisar conciliação: '.$result['review_url'];
-        if ($created > 0) {
-            $parts[] = 'Editar importadas em massa: '.$result['bulk_url'];
-        }
-
-        return implode("\n", $parts);
     }
 
     protected function resolveUserByPhone(string $phone): ?User

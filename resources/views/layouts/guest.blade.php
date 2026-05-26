@@ -9,10 +9,15 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0-rc7/dist/css/adminlte.min.css">
     @vite(['resources/css/app.css'])
 </head>
-<body class="login-page bg-body-secondary">
+<body class="login-page bg-body-secondary fiq-guest">
 <div class="login-box">
     <div class="login-logo">
-        <a href="{{ route('login') }}">{!! config('adminlte.logo') !!}</a>
+        <a href="{{ route('login') }}">
+            @if(file_exists(public_path('financialiq/logo_transparent.png')))
+                <img src="{{ asset('financialiq/logo_transparent.png') }}" alt="FinancialIQ" class="fiq-guest-logo">
+            @endif
+            <span>{!! config('adminlte.logo') !!}</span>
+        </a>
     </div>
     <div class="card shadow">
         <div class="card-body login-card-body">

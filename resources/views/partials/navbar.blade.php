@@ -7,7 +7,10 @@
                 </a>
             </li>
             <li class="nav-item d-none d-md-block">
-                <span class="nav-link text-muted">{{ $currentWorkspace->name ?? 'Workspace' }}</span>
+                <span class="nav-link fiq-workspace-pill">
+                    <i class="bi bi-building-check"></i>
+                    {{ $currentWorkspace->name ?? 'Workspace' }}
+                </span>
             </li>
         </ul>
         <ul class="navbar-nav ms-auto">
