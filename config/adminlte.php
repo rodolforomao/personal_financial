@@ -96,7 +96,7 @@ return [
             'icon' => 'bi bi-activity',
         ],
         [
-            'text' => 'Telegram / WhatsApp',
+            'text' => 'Integrações',
             'route' => 'integrations.settings',
             'icon' => 'bi bi-chat-dots',
         ],
