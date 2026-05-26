@@ -9,6 +9,7 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
+      TZ: "America/Sao_Paulo"
       SERVER_PORT: "8085"
       AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
       SERVER_URL: ${EVOLUTION_SERVER_URL:-http://127.0.0.1:8085}
@@ -18,8 +19,12 @@ services:
       DATABASE_CONNECTION_CLIENT_NAME: evolution_financial_prod
       CACHE_REDIS_ENABLED: "false"
       CACHE_LOCAL_ENABLED: "true"
-      CONFIG_SESSION_PHONE_CLIENT: Chrome
-      CONFIG_SESSION_PHONE_VERSION: "2.3000.1033773198"
+      CONFIG_SESSION_PHONE_CLIENT: Ubuntu
+      CONFIG_SESSION_PHONE_VERSION: "2.3000.1035194821"
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      QRCODE_LIMIT: "30"
+      QRCODE_EXPIRATION_TIME: "45"
+      DEL_INSTANCE: "false"
       DATABASE_SAVE_DATA_INSTANCE: "true"
       DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
       DATABASE_SAVE_DATA_CONTACTS: "false"

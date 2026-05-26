@@ -11,6 +11,28 @@
 
 @section('content')
 @if($canViewOperationalDetails)
+    <div class="card card-outline card-warning mb-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <h3 class="card-title mb-0"><i class="bi bi-shield-check"></i> Verificação de proxy (Tailscale + SOCKS5)</h3>
+            <button type="button" id="btn-proxy-check" class="btn btn-sm btn-warning">
+                <i class="bi bi-play-circle"></i> Verificar agora
+            </button>
+        </div>
+        <div class="card-body">
+            <p class="small text-muted mb-2">
+                Valida cada componente da cadeia: IP do VPS → SOCKS5 (Galaxy S22 via Tailscale) → ponte HTTP local → IP de saída → configuração Evolution.
+            </p>
+            <div id="proxy-check-results" style="display:none">
+                <div id="proxy-check-loading" class="text-center py-3" style="display:none">
+                    <div class="spinner-border spinner-border-sm text-warning" role="status"></div>
+                    <span class="ms-2 small">Verificando componentes…</span>
+                </div>
+                <ul id="proxy-check-list" class="list-group list-group-flush" style="display:none"></ul>
+                <div id="proxy-check-error" class="alert alert-danger small mt-2 mb-0" style="display:none"></div>
+            </div>
+        </div>
+    </div>
+
     <div class="card card-outline card-info mb-3">
         <div class="card-header"><h3 class="card-title mb-0"><i class="bi bi-terminal"></i> Processos no servidor</h3></div>
         <div class="card-body">
@@ -155,7 +177,7 @@
                                     <div class="form-text text-danger mt-1">
                                         <i class="bi bi-exclamation-octagon"></i>
                                         Status atual: <strong>{{ $evolution['connection']['state'] ?? 'desconhecido' }}</strong>.
-                                        Abra <a href="http://127.0.0.1:8081/manager" target="_blank" rel="noopener">Evolution Manager</a>,
+                                        Abra <a href="http://127.0.0.1:8085/manager" target="_blank" rel="noopener">Evolution Manager</a>,
                                         escaneie o QR da instância <code>{{ config('financial.integrations.evolution.instance_name') }}</code>
                                         e aguarde <strong>open</strong> antes de testar.
                                     </div>
@@ -334,6 +356,62 @@ document.querySelectorAll('input[name="whatsapp_mode"]').forEach(r => {
     r.addEventListener('change', toggle);
     toggle();
 });
+
+(function () {
+    const btn = document.getElementById('btn-proxy-check');
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+        const resultsWrap = document.getElementById('proxy-check-results');
+        const loading     = document.getElementById('proxy-check-loading');
+        const list        = document.getElementById('proxy-check-list');
+        const errBox      = document.getElementById('proxy-check-error');
+
+        resultsWrap.style.display = 'block';
+        loading.style.display     = 'block';
+        list.style.display        = 'none';
+        errBox.style.display      = 'none';
+        list.innerHTML            = '';
+        btn.disabled              = true;
+
+        fetch('{{ route('integrations.proxy.check') }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json',
+            },
+        })
+        .then(r => r.json())
+        .then(data => {
+            loading.style.display = 'none';
+            if (data.error) {
+                errBox.textContent   = data.error;
+                errBox.style.display = 'block';
+                return;
+            }
+            const checks = data.checks || {};
+            Object.values(checks).forEach(c => {
+                const icon = c.ok
+                    ? '<i class="bi bi-check-circle-fill text-success me-2"></i>'
+                    : '<i class="bi bi-x-circle-fill text-danger me-2"></i>';
+                const val  = c.value ? `<code class="ms-1">${c.value}</code>` : '';
+                const err  = c.error && !c.ok ? `<span class="text-danger ms-2 small">(${c.error})</span>` : '';
+                const li   = document.createElement('li');
+                li.className   = 'list-group-item py-2 small';
+                li.innerHTML   = `${icon}<strong>${c.label}</strong>${val}${err}`;
+                list.appendChild(li);
+            });
+            list.style.display = 'block';
+        })
+        .catch(e => {
+            loading.style.display = 'none';
+            errBox.textContent   = 'Erro de comunicação: ' + e.message;
+            errBox.style.display = 'block';
+        })
+        .finally(() => { btn.disabled = false; });
+    });
+})();
 </script>
 @endpush
 @endsection

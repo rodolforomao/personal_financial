@@ -145,6 +145,7 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::get('integrations/gmail/callback', [IntegrationSettingsController::class, 'gmailCallback'])->name('integrations.gmail.callback');
         Route::post('integrations/gmail/sync', [IntegrationSettingsController::class, 'syncGmail'])->name('integrations.gmail.sync');
         Route::delete('integrations/gmail', [IntegrationSettingsController::class, 'disconnectGmail'])->name('integrations.gmail.disconnect');
+        Route::post('integrations/proxy-check', [IntegrationSettingsController::class, 'proxyCheck'])->name('integrations.proxy.check');
 
         Route::get('ai/settings', [AiSettingsController::class, 'edit'])->name('ai.settings');
         Route::put('ai/settings', [AiSettingsController::class, 'update'])->name('ai.settings.update');

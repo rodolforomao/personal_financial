@@ -6,9 +6,11 @@ use App\Application\Services\PlatformOperationsGuide;
 use App\Core\Support\IntegrationCredentialsResolver;
 use App\Core\Support\NotificationDestinationNormalizer;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Modules\Alerts\Infrastructure\Models\AlertChannel;
@@ -381,5 +383,102 @@ class IntegrationSettingsController extends Controller
                     ->update(['is_active' => false]);
             }
         }
+    }
+
+    public function proxyCheck(Request $request): JsonResponse
+    {
+        if (! $request->user()->hasRole('admin')) {
+            return response()->json(['error' => 'Acesso negado.'], 403);
+        }
+
+        $socksHost = config('financial.integrations.evolution.proxy_socks_host', '100.73.222.119');
+        $socksPort = (int) config('financial.integrations.evolution.proxy_socks_port', 1080);
+        $bridgeHost = '127.0.0.1';
+        $bridgePort = (int) config('financial.integrations.evolution.http_bridge_port', 18080);
+
+        $results = [];
+
+        // 1. VPS direct IP
+        try {
+            $vpsIp = Http::timeout(8)->get('https://api.ipify.org')->body();
+            $vpsIp = trim($vpsIp);
+            $results['vps_ip'] = ['ok' => (bool) filter_var($vpsIp, FILTER_VALIDATE_IP), 'value' => $vpsIp, 'label' => 'IP direto do VPS'];
+        } catch (\Throwable $e) {
+            $results['vps_ip'] = ['ok' => false, 'value' => null, 'label' => 'IP direto do VPS', 'error' => $e->getMessage()];
+        }
+
+        // 2. SOCKS5 port (Galaxy S22 via Tailscale)
+        $sock = @fsockopen($socksHost, $socksPort, $errno, $errstr, 5);
+        if ($sock) {
+            fclose($sock);
+            $results['socks5'] = ['ok' => true, 'value' => "{$socksHost}:{$socksPort}", 'label' => 'SOCKS5 (Galaxy S22 / Tailscale)'];
+        } else {
+            $results['socks5'] = ['ok' => false, 'value' => "{$socksHost}:{$socksPort}", 'label' => 'SOCKS5 (Galaxy S22 / Tailscale)', 'error' => "{$errno}: {$errstr}"];
+        }
+
+        // 3. HTTP bridge (local SOCKS→HTTP proxy)
+        $bridge = @fsockopen($bridgeHost, $bridgePort, $errno, $errstr, 3);
+        if ($bridge) {
+            fclose($bridge);
+            $results['http_bridge'] = ['ok' => true, 'value' => "{$bridgeHost}:{$bridgePort}", 'label' => 'Ponte HTTP→SOCKS5 (local)'];
+        } else {
+            $results['http_bridge'] = ['ok' => false, 'value' => "{$bridgeHost}:{$bridgePort}", 'label' => 'Ponte HTTP→SOCKS5 (local)', 'error' => "{$errno}: {$errstr}"];
+        }
+
+        // 4. Exit IP through proxy
+        $proxyExitIp = null;
+        try {
+            $proxyExitIp = trim(Http::withOptions(['proxy' => "http://{$bridgeHost}:{$bridgePort}"])->timeout(12)->get('https://api.ipify.org')->body());
+            $results['proxy_exit_ip'] = ['ok' => (bool) filter_var($proxyExitIp, FILTER_VALIDATE_IP), 'value' => $proxyExitIp, 'label' => 'IP de saída via proxy'];
+        } catch (\Throwable $e) {
+            $results['proxy_exit_ip'] = ['ok' => false, 'value' => null, 'label' => 'IP de saída via proxy', 'error' => $e->getMessage()];
+        }
+
+        // 5. IP difference check
+        $vpsIpVal = $results['vps_ip']['value'] ?? null;
+        if ($vpsIpVal && $proxyExitIp && $vpsIpVal !== $proxyExitIp) {
+            $results['ip_diff'] = ['ok' => true, 'value' => "{$vpsIpVal} ≠ {$proxyExitIp}", 'label' => 'IPs distintos (VPS ≠ proxy)'];
+        } elseif ($vpsIpVal && $proxyExitIp) {
+            $results['ip_diff'] = ['ok' => false, 'value' => "{$vpsIpVal} = {$proxyExitIp}", 'label' => 'IPs distintos (VPS ≠ proxy)', 'error' => 'O tráfego não está saindo pelo proxy — mesmo IP'];
+        } else {
+            $results['ip_diff'] = ['ok' => false, 'value' => null, 'label' => 'IPs distintos (VPS ≠ proxy)', 'error' => 'Não foi possível obter ambos os IPs'];
+        }
+
+        // 6. Evolution proxy config
+        $evolutionService = app(EvolutionService::class);
+        $apiUrl = config('financial.integrations.evolution.api_url');
+        $apiKey = config('financial.integrations.evolution.api_key');
+        $instance = config('financial.integrations.evolution.instance_name');
+        try {
+            $resp = Http::withHeaders(['apikey' => $apiKey])->timeout(8)->get("{$apiUrl}/proxy/find/{$instance}");
+            $proxyConfig = $resp->json();
+            $proxyEnabled = $proxyConfig['proxy']['enabled'] ?? $proxyConfig['enabled'] ?? false;
+            $proxyHost = $proxyConfig['proxy']['host'] ?? $proxyConfig['host'] ?? '?';
+            $proxyPort = $proxyConfig['proxy']['port'] ?? $proxyConfig['port'] ?? '?';
+            $results['evolution_proxy'] = [
+                'ok' => (bool) $proxyEnabled,
+                'value' => "enabled={$proxyEnabled}, {$proxyHost}:{$proxyPort}",
+                'label' => 'Proxy configurado na instância Evolution',
+                'error' => $proxyEnabled ? null : 'Proxy desativado na instância — o Evolution não usará o túnel',
+            ];
+        } catch (\Throwable $e) {
+            $results['evolution_proxy'] = ['ok' => false, 'value' => null, 'label' => 'Proxy configurado na instância Evolution', 'error' => $e->getMessage()];
+        }
+
+        // 7. Evolution instance connection state
+        try {
+            $conn = $evolutionService->configured() ? $evolutionService->connectionState() : null;
+            $state = $conn['state'] ?? null;
+            $results['evolution_state'] = [
+                'ok' => $state === 'open',
+                'value' => $state ?? 'desconhecido',
+                'label' => 'Estado da instância Evolution',
+                'error' => $state !== 'open' ? "Estado: {$state} (esperado: open)" : null,
+            ];
+        } catch (\Throwable $e) {
+            $results['evolution_state'] = ['ok' => false, 'value' => null, 'label' => 'Estado da instância Evolution', 'error' => $e->getMessage()];
+        }
+
+        return response()->json(['checks' => $results]);
     }
 }
