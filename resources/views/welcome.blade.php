@@ -10,6 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="FinancialIQ centraliza fluxo de caixa, conciliação de extratos, alertas e inteligência financeira para decisões mais rápidas.">
     <title>FinancialIQ — Dashboard financeiro inteligente</title>
+    @include('partials.brand-head')
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
