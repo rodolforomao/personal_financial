@@ -86,6 +86,7 @@ class FinancialReportExportService
                 'number' => sprintf('%s-%05d', $type->numberPrefix(), $sequence),
                 'type_label' => $type->label(),
                 'date' => $transaction->transaction_date->format('d/m/Y'),
+                'date_sort' => $transaction->transaction_date->format('Y-m-d'),
                 'description' => $transaction->description ?? '',
                 'category' => $transaction->category?->name ?? '—',
                 'classification' => $this->classificationLabel($transaction),

@@ -96,6 +96,7 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::get('transactions/{transaction}/edit', [TransactionController::class, 'edit'])->name('transactions.edit');
         Route::put('transactions/{transaction}', [TransactionController::class, 'update'])->name('transactions.update');
         Route::delete('transactions/{transaction}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
+        Route::post('transactions/{transaction}/mirror-personal', [TransactionController::class, 'createPersonalMirror'])->name('transactions.mirror-personal');
         Route::post('transactions/{transaction}/receipts/extract', [ReceiptExtractController::class, 'storeAndPrefill'])->name('transactions.receipts.extract');
         Route::post('transactions/{transaction}/receipts', [TransactionReceiptController::class, 'store'])->name('transactions.receipts.store');
         Route::post('transactions/{transaction}/receipts/link', [TransactionReceiptController::class, 'link'])->name('transactions.receipts.link');

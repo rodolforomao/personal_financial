@@ -80,7 +80,7 @@ class OperationController extends Controller
             'summary' => $summary->forOperation($operation),
             'recentTransactions' => Transaction::query()
                 ->where('operation_id', $operation->id)
-                ->with(['category', 'operationUnit'])
+                ->with(['category', 'operationUnit', 'linkedTransaction'])
                 ->latest('transaction_date')
                 ->limit(15)
                 ->get(),

@@ -125,6 +125,22 @@
                                 <td>{{ $tx->operationUnit?->displayName() ?? '—' }}</td>
                                 <td>
                                     <a href="{{ route('transactions.edit', $tx) }}">{{ $tx->description }}</a>
+                                    @if($tx->linkedTransaction)
+                                        <a href="{{ route('transactions.edit', $tx->linkedTransaction) }}"
+                                           class="ms-1 badge text-bg-secondary text-decoration-none"
+                                           title="Saída espelhada no capital pessoal: #{{ $tx->linkedTransaction->id }}">
+                                            <i class="bi bi-arrow-left-right"></i> capital pessoal
+                                        </a>
+                                    @elseif($tx->type->value === 'income')
+                                        <form method="POST" action="{{ route('transactions.mirror-personal', $tx) }}" class="d-inline">
+                                            @csrf
+                                            <button type="submit" class="ms-1 badge text-bg-warning border-0 text-decoration-none"
+                                                    style="cursor:pointer"
+                                                    title="Criar saída no capital pessoal (double-entry)">
+                                                <i class="bi bi-plus-circle"></i> registrar saída pessoal
+                                            </button>
+                                        </form>
+                                    @endif
                                 </td>
                                 <td>
                                     <span class="badge text-bg-{{ $tx->type->value === 'income' ? 'success' : 'danger' }}">{{ $tx->type->value }}</span>

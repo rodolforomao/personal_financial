@@ -6,15 +6,26 @@
     <li class="breadcrumb-item active">Relatórios</li>
 @endsection
 
+@push('styles')
+@if(($view ?? 'resumo') === 'detalhado')
+<link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.bootstrap5.min.css">
+@endif
+@endpush
+
 @section('content')
 @php
     $totals = $report['totals'];
     $money = fn (float $v) => 'R$ '.number_format($v, 2, ',', '.');
+    $isDetail = ($view ?? 'resumo') === 'detalhado';
 @endphp
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <p class="text-muted mb-0">
-        Resumo financeiro com os mesmos critérios de filtro das transações.
+        @if($isDetail)
+            Listagem detalhada dos lançamentos do relatório.
+        @else
+            Resumo financeiro com os mesmos critérios de filtro das transações.
+        @endif
         <strong>{{ $report['period_label'] }}</strong>
     </p>
     <div class="d-flex flex-wrap gap-2">
@@ -26,13 +37,16 @@
            class="btn btn-danger btn-sm">
             <i class="bi bi-file-earmark-pdf"></i> Baixar PDF
         </a>
-        <a href="{{ $report['transaction_list_url'] }}" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-list-ul"></i> Ver lançamentos
-        </a>
+        @if(!$isDetail)
+            <a href="{{ $detailUrl }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-table"></i> Ver detalhado
+            </a>
+        @endif
     </div>
 </div>
 
 @include('reports.partials._filters')
+@include('reports.partials._view_switch')
 
 <div class="row g-3 mb-3">
     <div class="col-lg-3 col-6">
@@ -73,138 +87,10 @@
     </div>
 </div>
 
-@if($totals['transaction_count'] === 0)
-    <div class="alert alert-info">
-        Nenhum lançamento confirmado ou conciliado corresponde aos filtros.
-        <a href="{{ route('reports.index') }}">Limpar filtros</a> ou
-        <a href="{{ route('transactions.index') }}">ir às transações</a>.
-    </div>
+@if($isDetail)
+    @include('reports.partials._detail_table')
 @else
-<div class="row g-3">
-    <div class="col-lg-6">
-        <div class="card card-outline card-secondary h-100">
-            <div class="card-header">
-                <h3 class="card-title mb-0">Por operação</h3>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped mb-0">
-                        <thead>
-                            <tr>
-                                <th>Operação</th>
-                                <th class="text-end">Receita</th>
-                                <th class="text-end">Despesa</th>
-                                <th class="text-end">Líquido</th>
-                                <th class="text-end">Qtd.</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($report['by_operation'] as $row)
-                                <tr>
-                                    <td>
-                                        @if($row['operation_id'])
-                                            <a href="{{ route('reports.index', array_merge(request()->query(), ['operation_id' => $row['operation_id'], 'operation_unit_id' => null])) }}">
-                                                {{ $row['label'] }}
-                                            </a>
-                                        @else
-                                            {{ $row['label'] }}
-                                        @endif
-                                    </td>
-                                    <td class="text-end text-success">{{ $money($row['income']) }}</td>
-                                    <td class="text-end text-danger">{{ $money($row['expense']) }}</td>
-                                    <td class="text-end"><strong>{{ $money($row['net']) }}</strong></td>
-                                    <td class="text-end text-muted">{{ $row['count'] }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="card card-outline card-secondary h-100">
-            <div class="card-header">
-                <h3 class="card-title mb-0">Por categoria</h3>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped mb-0">
-                        <thead>
-                            <tr>
-                                <th>Categoria</th>
-                                <th class="text-end">Receita</th>
-                                <th class="text-end">Despesa</th>
-                                <th class="text-end">Líquido</th>
-                                <th class="text-end">Qtd.</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($report['by_category'] as $row)
-                                <tr>
-                                    <td>
-                                        @if($row['category_id'])
-                                            <a href="{{ route('reports.index', array_merge(request()->query(), ['category_id' => $row['category_id']])) }}">
-                                                {{ $row['label'] }}
-                                            </a>
-                                        @else
-                                            {{ $row['label'] }}
-                                        @endif
-                                    </td>
-                                    <td class="text-end text-success">{{ $money($row['income']) }}</td>
-                                    <td class="text-end text-danger">{{ $money($row['expense']) }}</td>
-                                    <td class="text-end"><strong>{{ $money($row['net']) }}</strong></td>
-                                    <td class="text-end text-muted">{{ $row['count'] }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-12">
-        <div class="card card-outline card-secondary">
-            <div class="card-header">
-                <h3 class="card-title mb-0">Por empresa</h3>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped mb-0">
-                        <thead>
-                            <tr>
-                                <th>Empresa</th>
-                                <th class="text-end">Receita</th>
-                                <th class="text-end">Despesa</th>
-                                <th class="text-end">Líquido</th>
-                                <th class="text-end">Qtd.</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($report['by_company'] as $row)
-                                <tr>
-                                    <td>
-                                        @if($row['company_id'])
-                                            <a href="{{ route('reports.index', array_merge(request()->query(), ['company_id' => $row['company_id']])) }}">
-                                                {{ $row['label'] }}
-                                            </a>
-                                        @else
-                                            {{ $row['label'] }}
-                                        @endif
-                                    </td>
-                                    <td class="text-end text-success">{{ $money($row['income']) }}</td>
-                                    <td class="text-end text-danger">{{ $money($row['expense']) }}</td>
-                                    <td class="text-end"><strong>{{ $money($row['net']) }}</strong></td>
-                                    <td class="text-end text-muted">{{ $row['count'] }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+    @include('reports.partials._summary', ['money' => $money])
 @endif
 @endsection
 
@@ -244,4 +130,26 @@
     });
 })();
 </script>
+@if($isDetail && count($detailRows) > 0)
+<script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/2.0.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+(function () {
+    const tableEl = document.getElementById('report-transactions-table');
+    if (!tableEl || typeof DataTable === 'undefined') return;
+
+    new DataTable(tableEl, {
+        order: [[2, 'asc'], [0, 'asc']],
+        pageLength: 25,
+        lengthMenu: [10, 25, 50, 100, 250],
+        language: {
+            url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/pt-BR.json',
+        },
+        columnDefs: [
+            { targets: 7, className: 'text-end' },
+        ],
+    });
+})();
+</script>
+@endif
 @endpush

@@ -74,6 +74,21 @@
                     'preselectedUnitId' => $preselectedUnitId ?? null,
                 ])
 
+                <div class="col-12" id="mirror-personal-wrapper" style="display:none">
+                    <div class="alert alert-warning py-2 mb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-arrow-left-right fs-5"></i>
+                        <div>
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" name="mirror_personal_capital" value="1" id="mirror-personal-capital">
+                                <label class="form-check-label fw-semibold" for="mirror-personal-capital">
+                                    Registrar saída do capital pessoal (double-entry)
+                                </label>
+                            </div>
+                            <small class="text-muted">Cria automaticamente uma despesa espelhada no dashboard principal — representa que o dinheiro saiu do seu bolso.</small>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="col-12">
                     <div class="form-check mb-2">
                         <input class="form-check-input" type="checkbox" name="is_recurring" value="1" id="is-recurring">
@@ -103,6 +118,23 @@
 document.getElementById('is-recurring').addEventListener('change', function () {
     document.getElementById('frequency-field').style.display = this.checked ? '' : 'none';
 });
+
+(function () {
+    const typeSelect = document.getElementById('tx-type');
+    const opSelect = document.getElementById('tx-operation-id');
+    const wrapper = document.getElementById('mirror-personal-wrapper');
+    const checkbox = document.getElementById('mirror-personal-capital');
+
+    function syncMirrorVisibility() {
+        const show = typeSelect?.value === 'income' && opSelect?.value;
+        wrapper.style.display = show ? '' : 'none';
+        if (!show) checkbox.checked = false;
+    }
+
+    typeSelect?.addEventListener('change', syncMirrorVisibility);
+    opSelect?.addEventListener('change', syncMirrorVisibility);
+    syncMirrorVisibility();
+})();
 
 (function () {
     const docId = sessionStorage.getItem('link_document_id');

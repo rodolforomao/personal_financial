@@ -7,6 +7,7 @@
     </div>
     <div class="card-body py-2">
         <form method="GET" action="{{ route('reports.index') }}" id="report-filter-form">
+            <input type="hidden" name="view" value="{{ $view ?? 'resumo' }}">
             <div class="row g-2 align-items-end">
                 <div class="col-md-2 col-lg-2">
                     <label class="form-label small mb-0">Data de</label>

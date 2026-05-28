@@ -11,6 +11,7 @@ use App\Http\Controllers\Web\Concerns\ResolvesOperationOnTransaction;
 use App\Http\Controllers\Web\Concerns\ValidatesTransactionPaymentFields;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use App\Application\Services\ReceiptCategorySuggestionService;
 use Modules\Categorization\Application\Services\BulkCategorizeTransactionsService;
@@ -34,7 +35,7 @@ class TransactionController extends Controller
         $workspaceId = (int) $request->attributes->get('workspace_id');
         $query = Transaction::query()
             ->where('workspace_id', $workspaceId)
-            ->with(['category', 'company', 'operation', 'operationUnit', 'recurringItem'])
+            ->with(['category', 'company', 'operation', 'operationUnit', 'recurringItem', 'linkedTransaction.operation'])
             ->withCount('documents');
 
         $filters->apply($query, $request);
@@ -323,25 +324,61 @@ class TransactionController extends Controller
             isset($validated['company_id']) ? (int) $validated['company_id'] : null,
         );
 
-        $transaction = $action->execute(new CreateTransactionData(
-            workspaceId: $workspaceId,
-            type: TransactionType::from($validated['type']),
-            amount: (float) $validated['amount'],
-            description: $validated['description'],
-            transactionDate: $validated['transaction_date'],
-            categoryId: $validated['category_id'] ?? null,
-            companyId: $operationFields['company_id'] ?? ($validated['company_id'] ?? null),
-            operationId: $operationFields['operation_id'],
-            operationUnitId: $operationFields['operation_unit_id'],
-            status: isset($validated['status']) ? TransactionStatus::from($validated['status']) : TransactionStatus::Confirmed,
-            counterparty: $validated['counterparty'] ?? null,
-            fundingSource: $payment['funding_source'],
-            paymentMethod: $payment['payment_method'],
-            isRecurring: $isRecurring,
-            recurrenceFrequency: $isRecurring
-                ? RecurrenceFrequency::from($validated['recurrence_frequency'])
-                : null,
-        ));
+        $type = TransactionType::from($validated['type']);
+        $status = isset($validated['status']) ? TransactionStatus::from($validated['status']) : TransactionStatus::Confirmed;
+        $companyId = $operationFields['company_id'] ?? ($validated['company_id'] ?? null);
+
+        $mirrorPersonal = $request->boolean('mirror_personal_capital')
+            && $operationFields['operation_id']
+            && $type === TransactionType::Income;
+
+        $transaction = DB::transaction(function () use (
+            $action, $workspaceId, $type, $status, $companyId, $validated, $operationFields,
+            $payment, $isRecurring, $mirrorPersonal,
+        ) {
+            $tx = $action->execute(new CreateTransactionData(
+                workspaceId: $workspaceId,
+                type: $type,
+                amount: (float) $validated['amount'],
+                description: $validated['description'],
+                transactionDate: $validated['transaction_date'],
+                categoryId: $validated['category_id'] ?? null,
+                companyId: $companyId,
+                operationId: $operationFields['operation_id'],
+                operationUnitId: $operationFields['operation_unit_id'],
+                status: $status,
+                counterparty: $validated['counterparty'] ?? null,
+                fundingSource: $payment['funding_source'],
+                paymentMethod: $payment['payment_method'],
+                isRecurring: $isRecurring,
+                recurrenceFrequency: $isRecurring
+                    ? RecurrenceFrequency::from($validated['recurrence_frequency'])
+                    : null,
+            ));
+
+            if ($mirrorPersonal) {
+                $mirror = $action->execute(new CreateTransactionData(
+                    workspaceId: $workspaceId,
+                    type: TransactionType::Expense,
+                    amount: (float) $validated['amount'],
+                    description: $validated['description'],
+                    transactionDate: $validated['transaction_date'],
+                    categoryId: $validated['category_id'] ?? null,
+                    companyId: $companyId,
+                    operationId: null,
+                    operationUnitId: null,
+                    status: $status,
+                    counterparty: $validated['counterparty'] ?? null,
+                    fundingSource: $payment['funding_source'],
+                    paymentMethod: $payment['payment_method'],
+                    source: 'mirror',
+                ));
+                $tx->update(['linked_transaction_id' => $mirror->id]);
+                $mirror->update(['linked_transaction_id' => $tx->id]);
+            }
+
+            return $tx;
+        });
 
         if (! empty($validated['document_id'])) {
             Document::query()
@@ -354,7 +391,9 @@ class TransactionController extends Controller
         if ($operationFields['operation_id']) {
             return redirect()
                 ->route('operations.show', $operationFields['operation_id'])
-                ->with('success', 'Lançamento registrado na operação.');
+                ->with('success', $transaction->linked_transaction_id
+                    ? 'Lançamento registrado na operação e saída espelhada no capital pessoal.'
+                    : 'Lançamento registrado na operação.');
         }
 
         return redirect()
@@ -368,7 +407,7 @@ class TransactionController extends Controller
         $workspaceId = (int) $request->attributes->get('workspace_id');
 
         return view('finance.transactions.edit', [
-            'transaction' => $transaction->load(['category', 'company', 'operation', 'operationUnit', 'documents']),
+            'transaction' => $transaction->load(['category', 'company', 'operation', 'operationUnit', 'documents', 'linkedTransaction']),
             'categories' => Category::query()->where('workspace_id', $workspaceId)->orderBy('name')->get(),
             'companies' => Company::query()->where('workspace_id', $workspaceId)->orderBy('name')->get(),
             'operations' => $this->operationsForForm($workspaceId),
@@ -411,20 +450,35 @@ class TransactionController extends Controller
             $request->validate(['current_password' => ['required', 'current_password']]);
         }
 
-        $transaction->update([
-            'description' => $validated['description'],
-            'counterparty' => $validated['counterparty'] ?? null,
-            'funding_source' => $payment['funding_source'],
-            'payment_method' => $payment['payment_method'],
-            'amount' => $validated['amount'],
-            'transaction_date' => $validated['transaction_date'],
-            'type' => $validated['type'],
-            'status' => $validated['status'],
-            'category_id' => $validated['category_id'] ?? null,
-            'company_id' => $operationFields['company_id'] ?? ($validated['company_id'] ?? null),
-            'operation_id' => $operationFields['operation_id'],
-            'operation_unit_id' => $operationFields['operation_unit_id'],
-        ]);
+        DB::transaction(function () use ($transaction, $validated, $payment, $operationFields) {
+            $transaction->update([
+                'description' => $validated['description'],
+                'counterparty' => $validated['counterparty'] ?? null,
+                'funding_source' => $payment['funding_source'],
+                'payment_method' => $payment['payment_method'],
+                'amount' => $validated['amount'],
+                'transaction_date' => $validated['transaction_date'],
+                'type' => $validated['type'],
+                'status' => $validated['status'],
+                'category_id' => $validated['category_id'] ?? null,
+                'company_id' => $operationFields['company_id'] ?? ($validated['company_id'] ?? null),
+                'operation_id' => $operationFields['operation_id'],
+                'operation_unit_id' => $operationFields['operation_unit_id'],
+            ]);
+
+            if ($transaction->linked_transaction_id) {
+                Transaction::withoutTimestamps(function () use ($transaction, $validated) {
+                    Transaction::query()
+                        ->whereKey($transaction->linked_transaction_id)
+                        ->update([
+                            'description' => $validated['description'],
+                            'amount' => $validated['amount'],
+                            'transaction_date' => $validated['transaction_date'],
+                            'counterparty' => $validated['counterparty'] ?? null,
+                        ]);
+                });
+            }
+        });
 
         if ($operationFields['operation_id']) {
             return redirect()
@@ -449,6 +503,43 @@ class TransactionController extends Controller
             ->get();
     }
 
+    public function createPersonalMirror(Request $request, Transaction $transaction, CreateTransactionAction $action): RedirectResponse
+    {
+        $this->authorize('update', $transaction);
+
+        abort_if($transaction->linked_transaction_id, 422, 'Este lançamento já possui uma contraparte.');
+        abort_if(! $transaction->operation_id, 422, 'Apenas lançamentos de operação podem ter espelho no capital pessoal.');
+        abort_if($transaction->type !== TransactionType::Income, 422, 'Apenas receitas de operação podem ser espelhadas como saída pessoal.');
+
+        DB::transaction(function () use ($transaction, $action) {
+            $mirror = $action->execute(new CreateTransactionData(
+                workspaceId: $transaction->workspace_id,
+                type: TransactionType::Expense,
+                amount: (float) $transaction->amount,
+                description: $transaction->description,
+                transactionDate: $transaction->transaction_date->format('Y-m-d'),
+                categoryId: $transaction->category_id,
+                companyId: $transaction->company_id,
+                operationId: null,
+                operationUnitId: null,
+                status: $transaction->status,
+                counterparty: $transaction->counterparty,
+                fundingSource: $transaction->funding_source,
+                paymentMethod: $transaction->payment_method,
+                source: 'mirror',
+            ));
+            $transaction->update(['linked_transaction_id' => $mirror->id]);
+            $mirror->update(['linked_transaction_id' => $transaction->id]);
+        });
+
+        $backRoute = $transaction->operation_id
+            ? route('operations.show', $transaction->operation_id)
+            : route('transactions.edit', $transaction);
+
+        return redirect($backRoute)
+            ->with('success', 'Saída no capital pessoal criada e vinculada ao lançamento da operação.');
+    }
+
     public function destroy(Request $request, Transaction $transaction): RedirectResponse
     {
         $this->authorize('delete', $transaction);
@@ -462,11 +553,20 @@ class TransactionController extends Controller
             'delete_confirmation.in' => 'Digite exatamente EXCLUIR para confirmar.',
         ]);
 
-        $transaction->delete();
+        DB::transaction(function () use ($transaction) {
+            $mirrorId = $transaction->linked_transaction_id;
+            $transaction->delete();
+
+            if ($mirrorId) {
+                Transaction::query()->whereKey($mirrorId)->first()?->delete();
+            }
+        });
 
         return redirect()
             ->route('transactions.index')
-            ->with('success', 'Transação #'.$transaction->id.' excluída (exclusão lógica — pode ser recuperada pelo suporte).');
+            ->with('success', 'Transação #'.$transaction->id.' excluída'
+                .($transaction->linked_transaction_id ? ' (e sua contraparte do capital pessoal)' : '')
+                .' — exclusão lógica.');
     }
 
     protected function sensitiveFieldsChanged(Request $request, Transaction $transaction): bool

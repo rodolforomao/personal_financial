@@ -247,6 +247,14 @@
                             @if(($tx->documents_count ?? 0) > 0)
                                 <span class="badge text-bg-info ms-1"><i class="bi bi-paperclip"></i> {{ $tx->documents_count }}</span>
                             @endif
+                            @if($tx->linkedTransaction)
+                                <a href="{{ route('transactions.edit', $tx->linkedTransaction) }}"
+                                   class="badge text-bg-secondary ms-1 text-decoration-none"
+                                   title="{{ $tx->operation_id ? 'Saída espelhada no capital pessoal' : 'Entrada espelhada na operação' }}: #{{ $tx->linkedTransaction->id }} · {{ $tx->linkedTransaction->operation?->name ?? 'capital pessoal' }}">
+                                    <i class="bi bi-arrow-left-right"></i>
+                                    {{ $tx->operation_id ? 'capital pessoal' : ($tx->linkedTransaction->operation?->name ?? '—') }}
+                                </a>
+                            @endif
                             @if($tx->counterparty)<br><small class="text-muted">{{ $tx->counterparty }}</small>@endif
                         </td>
                         <td>

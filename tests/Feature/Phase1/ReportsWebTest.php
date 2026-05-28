@@ -29,6 +29,15 @@ class ReportsWebTest extends TestCase
             ->assertSee('Baixar PDF');
     }
 
+    public function test_reports_with_filters_defaults_to_detail_view(): void
+    {
+        $this->actingAs($this->user)
+            ->withSession(['workspace_id' => $this->workspace->id])
+            ->get(route('reports.index', ['category_id' => 1, 'operation_id' => 1]))
+            ->assertOk()
+            ->assertSee('Listagem detalhada dos lançamentos');
+    }
+
     public function test_reports_export_xlsx_returns_spreadsheet(): void
     {
         $this->actingAs($this->user)

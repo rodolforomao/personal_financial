@@ -30,7 +30,8 @@ class Transaction extends Model
 
     protected $fillable = [
         'workspace_id', 'financial_account_id', 'category_id', 'company_id',
-        'project_id', 'operation_id', 'operation_unit_id', 'type', 'status', 'amount', 'currency', 'description',
+        'project_id', 'operation_id', 'operation_unit_id', 'linked_transaction_id',
+        'type', 'status', 'amount', 'currency', 'description',
         'counterparty', 'funding_source', 'payment_method', 'transaction_date', 'due_date', 'paid_at',
         'is_recurring', 'recurring_item_id', 'recurrence_frequency',
         'source', 'external_id', 'metadata', 'categorization_confidence',
@@ -90,6 +91,12 @@ class Transaction extends Model
     public function operationUnit(): BelongsTo
     {
         return $this->belongsTo(OperationUnit::class);
+    }
+
+    /** Transação espelhada (contraparte double-entry). */
+    public function linkedTransaction(): BelongsTo
+    {
+        return $this->belongsTo(Transaction::class, 'linked_transaction_id');
     }
 
     /** Visão consolidada: sem operação ou operações marcadas para o dashboard principal. */

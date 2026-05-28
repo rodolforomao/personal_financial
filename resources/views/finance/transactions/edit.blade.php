@@ -22,6 +22,44 @@
     'scanTransactionId' => $transaction->id,
 ])
 
+@if($transaction->operation_id && $transaction->type->value === 'income' && ! $transaction->linked_transaction_id)
+    <div class="alert alert-warning d-flex align-items-center justify-content-between gap-2 mb-3">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-arrow-left-right fs-5 flex-shrink-0"></i>
+            <div>
+                <strong>Este aporte ainda não tem contraparte no capital pessoal.</strong><br>
+                <small class="text-muted">Crie a despesa espelhada para representar que o dinheiro saiu do seu bolso.</small>
+            </div>
+        </div>
+        <form method="POST" action="{{ route('transactions.mirror-personal', $transaction) }}">
+            @csrf
+            <button type="submit" class="btn btn-warning btn-sm text-nowrap">
+                <i class="bi bi-plus-circle"></i> Registrar saída pessoal
+            </button>
+        </form>
+    </div>
+@endif
+
+@if($transaction->linkedTransaction)
+    @php $linked = $transaction->linkedTransaction; @endphp
+    <div class="alert alert-info d-flex align-items-center gap-2 mb-3">
+        <i class="bi bi-arrow-left-right fs-5 flex-shrink-0"></i>
+        <div>
+            <strong>Lançamento double-entry</strong> —
+            @if($transaction->operation_id)
+                Este é o lado <strong>entrada na operação</strong>.
+                A saída do capital pessoal está em
+            @else
+                Este é o lado <strong>saída do capital pessoal</strong>.
+                A entrada na operação está em
+            @endif
+            <a href="{{ route('transactions.edit', $linked) }}">#{{ $linked->id }} {{ $linked->description }}</a>
+            (R$ {{ number_format($linked->amount, 2, ',', '.') }} · {{ $linked->transaction_date->format('d/m/Y') }}).
+            Alterações em valor, data e descrição são sincronizadas automaticamente.
+        </div>
+    </div>
+@endif
+
 <div class="card card-primary">
     <form action="{{ route('transactions.update', $transaction) }}" method="POST" id="tx-edit-form">
         @csrf
@@ -141,6 +179,13 @@
                         <strong>Exclusão lógica:</strong> o lançamento some da lista, mas permanece no banco
                         (auditoria). Não é remoção física.
                     </div>
+                    @if($transaction->linkedTransaction)
+                    <div class="alert alert-danger small mb-3">
+                        <i class="bi bi-arrow-left-right"></i>
+                        <strong>Atenção:</strong> este lançamento tem uma contraparte double-entry (#{{ $transaction->linkedTransaction->id }}).
+                        Ambos serão excluídos juntos.
+                    </div>
+                    @endif
                     <div class="form-check mb-3">
                         <input class="form-check-input @error('confirm_delete') is-invalid @enderror" type="checkbox"
                             name="confirm_delete" value="1" id="confirm-delete" required>
