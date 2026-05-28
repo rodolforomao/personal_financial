@@ -17,6 +17,10 @@ class NavigationMenuSeeder extends Seeder
             ['type' => 'header', 'sort_order' => 10, 'label' => 'PRINCIPAL'],
             ['type' => 'link', 'sort_order' => 20, 'label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'bi bi-speedometer2'],
 
+            // Relatórios
+            ['type' => 'header', 'sort_order' => 90, 'label' => 'RELATÓRIOS'],
+            ['type' => 'link', 'sort_order' => 95, 'label' => 'Resumo financeiro', 'route' => 'reports.index', 'icon' => 'bi bi-bar-chart-line'],
+
             // Finanças — fluxo diário primeiro
             ['type' => 'header', 'sort_order' => 100, 'label' => 'FINANÇAS'],
             ['type' => 'link', 'sort_order' => 110, 'label' => 'Transações', 'route' => 'transactions.index', 'icon' => 'bi bi-arrow-left-right'],

@@ -106,6 +106,7 @@
 
 .fiq-sidebar-brand {
     border-bottom: 1px solid rgba(255, 210, 122, 0.16);
+    overflow: hidden;
 }
 
 .fiq-brand-link {
@@ -115,11 +116,15 @@
     padding: 0.9rem 1rem;
 }
 
-.fiq-brand-logo {
-    filter: drop-shadow(0 12px 24px rgba(246, 163, 26, 0.28));
-    height: 42px;
+.fiq-admin .sidebar-brand .fiq-brand-logo,
+.fiq-admin .sidebar-brand .brand-image {
+    filter: drop-shadow(0 8px 16px rgba(246, 163, 26, 0.22));
+    flex-shrink: 0;
+    height: auto;
+    max-height: 32px;
+    max-width: 32px;
     object-fit: contain;
-    width: 42px;
+    width: auto;
 }
 
 .fiq-brand-wordmark {

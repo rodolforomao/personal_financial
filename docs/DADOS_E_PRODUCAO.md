@@ -148,5 +148,5 @@ Restaurar backup em `financial_staging`, validar, depois repetir export para pro
 
 ## Referências no repositório
 
-- [PHASE1.md](PHASE1.md) — testes e banco `financial_test`
+- [PLATFORM.md](PLATFORM.md#testes) — testes e banco `financial_test`
 - [ROADMAP.md](ROADMAP.md) — hardening e backups em produção

@@ -5,14 +5,16 @@
     <div class="sidebar-brand fiq-sidebar-brand">
         <a href="{{ route('dashboard') }}" class="brand-link fiq-brand-link">
             @php
-                $sidebarLogo = file_exists(public_path('financialiq/logo_on_dark_transparent.png'))
-                    ? 'financialiq/logo_on_dark_transparent.png'
-                    : (file_exists(public_path('financialiq/logo_transparent.png'))
-                        ? 'financialiq/logo_transparent.png'
-                        : null);
+                $sidebarLogo = file_exists(public_path('financialiq/logo_on_dark_48x48.png'))
+                    ? 'financialiq/logo_on_dark_48x48.png'
+                    : (file_exists(public_path('financialiq/logo_on_dark_transparent.png'))
+                        ? 'financialiq/logo_on_dark_transparent.png'
+                        : (file_exists(public_path('financialiq/logo_transparent.png'))
+                            ? 'financialiq/logo_transparent.png'
+                            : null));
             @endphp
             @if($sidebarLogo)
-                <img src="{{ asset($sidebarLogo) }}" alt="FinancialIQ" class="fiq-brand-logo">
+                <img src="{{ asset($sidebarLogo) }}" alt="FinancialIQ" class="brand-image fiq-brand-logo" width="32" height="32">
             @endif
             <span class="fiq-brand-wordmark">
                 Financial<span>IQ</span>

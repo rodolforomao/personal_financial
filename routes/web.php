@@ -20,6 +20,7 @@ use App\Http\Controllers\Web\PlatformSettingsController;
 use App\Http\Controllers\Web\PlatformUserController;
 use App\Http\Controllers\Web\ProjectController;
 use App\Http\Controllers\Web\ReceiptExtractController;
+use App\Http\Controllers\Web\ReportController;
 use App\Http\Controllers\Web\StatementImportController;
 use App\Http\Controllers\Web\SubscriptionPaymentController;
 use App\Http\Controllers\Web\TransactionController;
@@ -65,6 +66,9 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
 
         Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::post('dashboard/filter', [DashboardController::class, 'updateFilter'])->name('dashboard.filter');
+
+        Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+        Route::get('reports/export', [ReportController::class, 'export'])->name('reports.export');
 
         Route::get('data-hygiene', [DataHygieneController::class, 'index'])->name('data-hygiene.index');
         Route::post('data-hygiene/fix', [DataHygieneController::class, 'applyFix'])->name('data-hygiene.fix');

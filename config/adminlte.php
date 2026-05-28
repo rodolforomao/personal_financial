@@ -12,6 +12,12 @@ return [
             'route' => 'dashboard',
             'icon' => 'bi bi-speedometer2',
         ],
+        ['header' => 'RELATÓRIOS'],
+        [
+            'text' => 'Resumo financeiro',
+            'route' => 'reports.index',
+            'icon' => 'bi bi-bar-chart-line',
+        ],
         ['header' => 'FINANÇAS'],
         [
             'text' => 'Transações',

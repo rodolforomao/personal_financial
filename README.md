@@ -14,23 +14,30 @@ SaaS financeiro enterprise com Laravel, IA, OCR, alertas inteligentes e arquitet
 ## Arquitetura
 
 ```
-Modules/
-├── Core/           # Workspaces, feature flags, multi-tenant
-├── Finance/        # Transações, fluxo de caixa, previsões, patrimônio
+Modules/                          # Domínio (API + regras de negócio)
+├── Core/           # Workspaces, feature flags, multi-tenant, API v1
+├── Finance/        # Transações, extratos, fluxo, previsões, CLT
 ├── Companies/      # Empresas, contratos, recorrências
-├── Projects/       # Projetos, ROI, custos
+├── Projects/       # Projetos, ROI, marcos
+├── Operations/     # Operações e unidades operacionais
 ├── Categorization/ # Regras + IA semântica
 ├── OCR/            # Documentos, fila OCR
 ├── Intelligence/   # IA financeira, observabilidade, assistente
 ├── Alerts/         # Detecção e notificações
-└── Integrations/   # Telegram, WhatsApp, webhooks
+└── Integrations/   # Telegram, WhatsApp, Gmail, webhooks
+
+app/Http/Controllers/Web/         # Painel AdminLTE (consome os módulos)
 ```
 
 Cada módulo segue camadas **Domain → Application → Infrastructure → Presentation**.
 
-Documentação detalhada: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) | **Prompt inicial × código:** [docs/PROMPT_TRACEABILITY.md](docs/PROMPT_TRACEABILITY.md)
-
-**Deploy (passo a passo):** [docs/DEPLOY.md](docs/DEPLOY.md) · **Dados e produção:** [docs/DADOS_E_PRODUCAO.md](docs/DADOS_E_PRODUCAO.md)
+| Documento | Conteúdo |
+|-----------|----------|
+| [docs/PLATFORM.md](docs/PLATFORM.md) | **Estrutura da plataforma** — módulos, rotas web, tabelas, estado atual |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Fluxos técnicos, princípios, segurança IA |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Fases e prioridades |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | Deploy passo a passo |
+| [docs/DADOS_E_PRODUCAO.md](docs/DADOS_E_PRODUCAO.md) | Backup, restore, produção |
 
 ## Setup rápido (desenvolvimento)
 
@@ -99,7 +106,7 @@ Base: `/api/v1` — Header obrigatório: `X-Workspace-Id: 1`
 | POST | `/api/v1/imports/ofx` | Importar extrato OFX |
 | POST | `/api/v1/imports/csv` | Importar CSV |
 
-**Fase 1 (backend):** ver [docs/PHASE1.md](docs/PHASE1.md). Testes (MySQL `financial_test`):
+**Testes** (MySQL `financial_test` — ver [docs/PLATFORM.md](docs/PLATFORM.md#testes)):
 
 ```bash
 bash scripts/setup-mysql-test.sh   # uma vez
@@ -132,11 +139,27 @@ docker compose exec app php artisan horizon
 
 No Telegram: `/ops` (processos necessários) e `/comandos` (rodar tarefas em segundo plano).
 
+## Painel web (principais rotas)
+
+| Rota | Função |
+|------|--------|
+| `/dashboard` | CFO dashboard + gráficos |
+| `/transactions` | Lançamentos, bulk, comprovantes |
+| `/statements` | Import OFX/CSV e conciliação |
+| `/operations` | Operações e unidades |
+| `/clt-salaries` | Salários CLT |
+| `/reports` | Relatórios financeiros |
+| `/ai/assistant` | Copiloto IA |
+| `/integrations/notifications` | Telegram, WhatsApp, Gmail |
+
+Lista completa: [docs/PLATFORM.md](docs/PLATFORM.md#rotas-web-painel).
+
 ## Filas
 
 - `ocr` — processamento de documentos
 - `ai` — análises e insights
 - `notifications` — alertas (email, Telegram, WhatsApp)
+- `default` — Telegram poll, Evolution inbound
 
 ## Variáveis importantes
 
@@ -147,8 +170,11 @@ OPENROUTER_API_KEY=
 OCR_PROVIDER=tesseract
 TELEGRAM_BOT_TOKEN=
 QUEUE_CONNECTION=redis
+TELEGRAM_SCHEDULED_POLL=true    # dev: schedule:work em vez de terminal poll
+GMAIL_CLIENT_ID=                 # integração Gmail (opcional)
 ```
 
 ## Scheduler
 
-Diariamente às 06:00: alertas, snapshots de caixa, previsões, análise IA e observabilidade.
+- **06:00** — `financial:daily` (alertas, caixa, previsão, IA, observabilidade)
+- **Opcional** — `telegram:poll`, `gmail:sync` (ver [docs/PLATFORM.md](docs/PLATFORM.md#operações-no-servidor))
