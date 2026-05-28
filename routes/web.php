@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Web\AccountSecurityController;
 use App\Http\Controllers\Web\AiController;
 use App\Http\Controllers\Web\AiSettingsController;
 use App\Http\Controllers\Web\AlertController;
@@ -23,11 +24,13 @@ use App\Http\Controllers\Web\StatementImportController;
 use App\Http\Controllers\Web\SubscriptionPaymentController;
 use App\Http\Controllers\Web\TransactionController;
 use App\Http\Controllers\Web\TransactionReceiptController;
+use App\Http\Controllers\Web\WorkspaceController;
 use App\Http\Middleware\SetWebWorkspace;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return auth()->check()
+    return Auth::check()
         ? redirect()->route('dashboard')
         : view('welcome');
 });
@@ -35,18 +38,31 @@ Route::get('/', function () {
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('login', [AuthController::class, 'login'])->name('login.attempt');
+    Route::get('forgot-password', [AuthController::class, 'showForgotPassword'])->name('password.request');
+    Route::post('forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
+    Route::get('reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
+    Route::post('reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
     Route::get('register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('register', [AuthController::class, 'register'])->name('register.store');
 });
 
 Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
+    Route::post('workspace/switch', [AuthController::class, 'switchWorkspace'])->name('workspace.switch');
+    Route::get('account/security', [AccountSecurityController::class, 'index'])->name('account.security');
+    Route::delete('account/sessions/{session}', [AccountSecurityController::class, 'revokeSession'])->name('account.sessions.destroy');
+    Route::post('account/tokens', [AccountSecurityController::class, 'storeToken'])->name('account.tokens.store');
+    Route::delete('account/tokens/{token}', [AccountSecurityController::class, 'revokeToken'])->name('account.tokens.destroy');
     Route::get('subscription/pending', [AuthController::class, 'pendingSubscription'])->name('subscription.pending');
     Route::post('subscription/payment', [SubscriptionPaymentController::class, 'store'])->name('subscription.payment.store');
     Route::post('subscription/payment/check', [SubscriptionPaymentController::class, 'check'])->name('subscription.payment.check');
     Route::get('subscription/payments/{payment}/qr-code.svg', [SubscriptionPaymentController::class, 'qrCode'])->name('subscription.payment.qr-code');
 
     Route::middleware('active.access')->group(function () {
+        Route::get('workspace', [WorkspaceController::class, 'index'])->name('workspace.index');
+        Route::post('workspace/reset', [WorkspaceController::class, 'reset'])->name('workspace.reset');
+        Route::post('workspace/members/invite', [WorkspaceController::class, 'inviteMember'])->name('workspace.members.invite');
+
         Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::post('dashboard/filter', [DashboardController::class, 'updateFilter'])->name('dashboard.filter');
 
@@ -107,6 +123,8 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::get('projects', [ProjectController::class, 'index'])->name('projects.index');
         Route::get('projects/create', [ProjectController::class, 'create'])->name('projects.create');
         Route::post('projects', [ProjectController::class, 'store'])->name('projects.store');
+        Route::get('projects/{project}/edit', [ProjectController::class, 'edit'])->name('projects.edit');
+        Route::put('projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
 
         Route::get('statements', [StatementImportController::class, 'index'])->name('statements.index');
         Route::post('statements', [StatementImportController::class, 'store'])->name('statements.store');
@@ -159,6 +177,7 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
 
         Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
             Route::get('users', [PlatformUserController::class, 'index'])->name('users.index');
+            Route::post('users/invite', [PlatformUserController::class, 'invite'])->name('users.invite');
             Route::patch('users/{user}/internal', [PlatformUserController::class, 'toggleInternal'])->name('users.toggle-internal');
             Route::patch('users/{user}/access', [PlatformUserController::class, 'updateAccess'])->name('users.update-access');
             Route::post('users/{user}/payments', [PlatformUserController::class, 'confirmPayment'])->name('users.confirm-payment');

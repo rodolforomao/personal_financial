@@ -42,6 +42,8 @@ class NavigationMenuSeeder extends Seeder
             ['type' => 'link', 'sort_order' => 410, 'label' => 'Alertas', 'route' => 'alerts.index', 'icon' => 'bi bi-bell'],
             ['type' => 'link', 'sort_order' => 420, 'label' => 'Telegram / WhatsApp', 'route' => 'integrations.settings', 'icon' => 'bi bi-chat-dots'],
             ['type' => 'link', 'sort_order' => 430, 'label' => 'Diagnóstico', 'route' => 'observability.index', 'icon' => 'bi bi-activity'],
+            ['type' => 'link', 'sort_order' => 440, 'label' => 'Workspaces', 'route' => 'workspace.index', 'icon' => 'bi bi-building-check'],
+            ['type' => 'link', 'sort_order' => 450, 'label' => 'Conta e segurança', 'route' => 'account.security', 'icon' => 'bi bi-shield-lock'],
 
             // Admin
             ['type' => 'header', 'sort_order' => 500, 'label' => 'ADMINISTRAÇÃO', 'required_role' => 'admin'],

@@ -24,7 +24,7 @@ fi
   read -r DB_DATABASE
   read -r DB_USERNAME
   read -r DB_PASSWORD
-} < <(php -r "
+} < <(php -d xdebug.mode=off -r "
 require 'vendor/autoload.php';
 \$app = require 'bootstrap/app.php';
 \$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
@@ -59,7 +59,7 @@ trap 'rm -f "$MY_CNF"' EXIT
 # --defaults-file (não --defaults-extra-file): ignora ~/.my.cnf do sistema, que costuma
 # ter outra senha e causa "Access denied" mesmo com .env correto.
 if ! mysqldump --defaults-file="$MY_CNF" \
-  --single-transaction --routines --triggers \
+  --single-transaction --routines --triggers --no-tablespaces \
   "$DB_DATABASE" | gzip -9 > "$OUT"; then
   echo "" >&2
   echo "Falha no mysqldump. Teste: php artisan db:show" >&2

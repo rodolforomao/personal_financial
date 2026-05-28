@@ -7,6 +7,7 @@ use App\Models\SubscriptionProfile;
 use App\Models\User;
 use App\Models\UserAccessPayment;
 use App\Services\UserAccessService;
+use App\Services\WorkspaceUserInviteService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Modules\Core\Infrastructure\Models\Workspace;
 use Modules\Integrations\Infrastructure\Models\IntegrationConnection;
 
 class PlatformUserController extends Controller
@@ -56,7 +58,49 @@ class PlatformUserController extends Controller
                 ->count(),
         ];
 
-        return view('admin.users.index', compact('users', 'profiles', 'stats', 'gmailConnections'));
+        $workspaces = Workspace::query()->orderBy('name')->get(['id', 'name', 'slug']);
+
+        return view('admin.users.index', compact('users', 'profiles', 'stats', 'gmailConnections', 'workspaces'));
+    }
+
+    public function invite(Request $request, WorkspaceUserInviteService $inviteService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'email' => 'required|email|max:255',
+            'name' => 'nullable|string|max:255',
+            'workspace_id' => ['required', 'integer', Rule::exists('workspaces', 'id')],
+            'role' => 'nullable|string|in:member,admin,owner',
+            'send_reset_link' => 'nullable|boolean',
+            'grant_platform_access' => 'nullable|boolean',
+        ]);
+
+        $result = $inviteService->invite(
+            email: $validated['email'],
+            workspaceId: (int) $validated['workspace_id'],
+            role: $validated['role'] ?? 'member',
+            name: $validated['name'] ?? null,
+            invitedBy: $request->user(),
+            sendResetLink: $request->boolean('send_reset_link', true),
+            grantPlatformAccess: $request->boolean('grant_platform_access', true),
+        );
+
+        $message = $result['created']
+            ? "Usuário {$result['user']->email} criado e vinculado ao workspace. "
+            : "{$result['user']->name} vinculado ao workspace. ";
+
+        if ($request->boolean('grant_platform_access', true)) {
+            $message .= 'Acesso à plataforma liberado por 1 ano. ';
+        }
+
+        if ($result['reset_link_sent']) {
+            $message .= 'Link para definir senha enviado por e-mail.';
+        } elseif ($result['created']) {
+            $message .= 'Configure o e-mail (MAIL_*) para enviar o link de senha.';
+        }
+
+        return redirect()
+            ->route('admin.users.index')
+            ->with('success', trim($message));
     }
 
     public function toggleInternal(Request $request, User $user): RedirectResponse

@@ -46,7 +46,10 @@ php artisan key:generate
 # Cria DB + utilizador financial (pede password do root/admin)
 bash scripts/setup-mysql-local.sh
 
-php artisan serve
+./scripts/start.sh
+# Para encerrar o ambiente deste projeto:
+./scripts/stop.sh
+# Atalhos equivalentes: composer start | composer stop
 # Um único processo substitui poll + fila + rotina diária (com TELEGRAM_SCHEDULED_*=true no .env):
 php artisan schedule:work
 # Alternativa manual: php artisan queue:listen --queue=default,ocr,ai,notifications
@@ -54,14 +57,14 @@ php artisan schedule:work
 
 Manualmente: `mysql -u root -p < scripts/mysql-setup.sql` e depois `php artisan migrate --seed`.
 
-### Alternativa: MySQL Docker (porta 3307)
+### Alternativa: MySQL Docker (porta 3307 — compartilhada)
 
 Se não tiver acesso admin ao MySQL local:
 
 ```bash
-docker compose up -d mysql
-# No .env: DB_PORT=3307
-php artisan migrate --seed
+bash scripts/setup-local.sh
+# MySQL 3307 e Redis 6379/6380 são portas compartilhadas entre projetos;
+# se já estiverem em uso, o script reutiliza o serviço existente (não sobe outro container).
 ```
 
 **Login demo:** `admin@financial.local` / `password`

@@ -24,6 +24,9 @@
         </div>
     </div>
 </form>
+<p class="mt-3 mb-1 text-center">
+    <a href="{{ route('password.request') }}">Esqueci minha senha</a>
+</p>
 <p class="mb-0 mt-3 text-center">
     <a href="{{ route('register') }}">Criar nova conta</a>
 </p>

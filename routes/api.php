@@ -1,32 +1,15 @@
 <?php
 
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\LiquidxPaymentWebhookController;
-use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Validation\ValidationException;
 
-Route::post('/auth/login', function (Request $request) {
-    $request->validate([
-        'email' => 'required|email',
-        'password' => 'required',
-    ]);
-
-    $user = User::where('email', $request->email)->first();
-
-    if (! $user || ! Hash::check($request->password, $user->password)) {
-        throw ValidationException::withMessages(['email' => ['Credenciais inválidas.']]);
-    }
-
-    return response()->json([
-        'token' => $user->createToken('api')->plainTextToken,
-        'user' => $user->load('workspaces'),
-    ]);
+Route::post('/auth/register', [AuthController::class, 'register']);
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::post('/auth/switch-workspace', [AuthController::class, 'switchWorkspace']);
 });
-
-Route::middleware('auth:sanctum')->get('/auth/me', fn (Request $request) => response()->json(
-    $request->user()->load('workspaces')
-));
 
 Route::post('/webhooks/liquidx/payments', LiquidxPaymentWebhookController::class)->name('webhooks.liquidx.payments');

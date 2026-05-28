@@ -11,6 +11,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\View\View;
 use Modules\Core\Infrastructure\Models\Workspace;
 
@@ -34,6 +37,58 @@ class AuthController extends Controller
         $profile = $this->defaultSubscriptionProfile();
 
         return view('auth.register', compact('profile'));
+    }
+
+    public function showForgotPassword(): View
+    {
+        return view('auth.forgot-password');
+    }
+
+    public function sendResetLink(Request $request): RedirectResponse
+    {
+        $validated = $request->validate(['email' => 'required|email']);
+
+        $status = Password::sendResetLink([
+            'email' => $validated['email'],
+        ]);
+
+        if ($status !== Password::RESET_LINK_SENT) {
+            return back()->withErrors(['email' => __($status)]);
+        }
+
+        return back()->with('success', 'Enviamos o link para redefinir sua senha.');
+    }
+
+    public function showResetPassword(string $token, Request $request): View
+    {
+        return view('auth.reset-password', [
+            'token' => $token,
+            'email' => (string) $request->string('email'),
+        ]);
+    }
+
+    public function resetPassword(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'token' => 'required|string',
+            'email' => 'required|email',
+            'password' => ['required', 'confirmed', PasswordRule::min(8)->letters()->numbers()],
+        ]);
+
+        $status = Password::reset(
+            $validated,
+            function (User $user, string $password): void {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                ])->save();
+            }
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            return back()->withErrors(['email' => __($status)]);
+        }
+
+        return redirect()->route('login')->with('success', 'Senha redefinida com sucesso.');
     }
 
     public function login(Request $request, UserAccessService $accessService): RedirectResponse
@@ -129,6 +184,35 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('login');
+    }
+
+    public function switchWorkspace(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'workspace_id' => 'required|integer',
+        ]);
+
+        $workspaceId = (int) $validated['workspace_id'];
+        $allowed = $request->user()
+            ->workspaces()
+            ->where('workspaces.id', $workspaceId)
+            ->exists();
+
+        abort_unless($allowed, 403, 'Workspace access denied.');
+
+        session(['workspace_id' => $workspaceId]);
+
+        $workspace = Workspace::query()->find($workspaceId);
+        $label = $workspace?->name ?? "#{$workspaceId}";
+
+        $redirect = $request->input('redirect_to');
+        if (is_string($redirect) && str_starts_with($redirect, url('/'))) {
+            return redirect($redirect)->with('success', "Workspace alterado para {$label}.");
+        }
+
+        return redirect()
+            ->route('dashboard')
+            ->with('success', "Workspace alterado para {$label}.");
     }
 
     private function defaultSubscriptionProfile(): SubscriptionProfile

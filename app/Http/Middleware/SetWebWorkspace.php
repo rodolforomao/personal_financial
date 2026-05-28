@@ -17,9 +17,18 @@ class SetWebWorkspace
                 ?? $user->workspaces()->value('workspaces.id');
 
             if ($workspaceId) {
+                $hasAccess = $user->workspaces()
+                    ->where('workspaces.id', $workspaceId)
+                    ->exists();
+
+                if (! $hasAccess) {
+                    $workspaceId = (int) $user->workspaces()->value('workspaces.id');
+                }
+
                 session(['workspace_id' => $workspaceId]);
                 $request->attributes->set('workspace_id', (int) $workspaceId);
                 view()->share('currentWorkspace', $user->workspaces()->find($workspaceId));
+                view()->share('availableWorkspaces', $user->workspaces()->orderBy('name')->get());
             }
         }
 

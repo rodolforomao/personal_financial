@@ -35,4 +35,9 @@ class Workspace extends Model
     {
         return $this->hasMany(FeatureFlag::class);
     }
+
+    public function invites(): HasMany
+    {
+        return $this->hasMany(WorkspaceInvite::class);
+    }
 }

@@ -1,8 +1,13 @@
 <?php
 
+use App\Core\Http\Middleware\EnsurePermission;
+use App\Core\Http\Middleware\EnsureWorkspaceAccess;
+use App\Http\Middleware\EnsureActivePlatformAccess;
+use App\Http\Middleware\EnsureAdminRole;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -13,12 +18,13 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'workspace' => \App\Core\Http\Middleware\EnsureWorkspaceAccess::class,
-            'admin' => \App\Http\Middleware\EnsureAdminRole::class,
-            'active.access' => \App\Http\Middleware\EnsureActivePlatformAccess::class,
+            'workspace' => EnsureWorkspaceAccess::class,
+            'permission' => EnsurePermission::class,
+            'admin' => EnsureAdminRole::class,
+            'active.access' => EnsureActivePlatformAccess::class,
         ]);
         $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            EnsureFrontendRequestsAreStateful::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

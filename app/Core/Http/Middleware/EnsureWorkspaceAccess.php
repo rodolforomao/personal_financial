@@ -10,7 +10,9 @@ class EnsureWorkspaceAccess
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $workspaceId = $request->header('X-Workspace-Id') ?? $request->route('workspace');
+        $workspaceId = $request->header('X-Workspace-Id')
+            ?? $request->route('workspace')
+            ?? ($request->user()?->workspaces()->value('workspaces.id'));
 
         if ($workspaceId && $request->user()) {
             $hasAccess = $request->user()

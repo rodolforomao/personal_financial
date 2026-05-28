@@ -12,6 +12,7 @@ use Modules\Categorization\Infrastructure\Models\Category;
 use Modules\Companies\Infrastructure\Models\Company;
 use Modules\Core\Infrastructure\Models\FeatureFlag;
 use Modules\Core\Infrastructure\Models\Workspace;
+use App\Services\RbacBootstrap;
 use Modules\Operations\Infrastructure\Models\Operation;
 use Spatie\Permission\Models\Role;
 
@@ -53,10 +54,8 @@ class FinancialPlatformSeeder extends Seeder
 
         $workspace->users()->syncWithoutDetaching([$user->id => ['role' => 'owner']]);
 
-        Role::findOrCreate('admin');
-        Role::findOrCreate('finance_manager');
-        Role::findOrCreate('viewer');
-        $user->assignRole('admin');
+        RbacBootstrap::sync();
+        $user->syncRoles(['SUPER_ADMIN', 'admin']);
 
         $categories = [
             ['name' => 'IA & APIs', 'slug' => 'ia', 'type' => 'expense', 'color' => '#6f42c1'],

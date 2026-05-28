@@ -183,8 +183,12 @@
                             o acesso ao sistema é habilitado automaticamente.
                         </p>
                     </div>
-                    <div class="text-muted small">
-                        {{ $users->total() }} usuário(s) encontrados
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="text-muted small">{{ $users->total() }} usuário(s) encontrados</span>
+                        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#invite-user-modal">
+                            <i class="bi bi-person-plus me-1"></i>
+                            Convidar usuário
+                        </button>
                     </div>
                 </div>
 
@@ -212,7 +216,7 @@
                                     $notificationPrefs = $prefs['notifications'] ?? [];
                                     $aiPrefs = $prefs['ai'] ?? [];
                                     $roles = $u->roles->pluck('name');
-                                    $workspaces = $u->workspaces->map(fn ($workspace) => $workspace->name.' (#'.$workspace->id.', '.$workspace->pivot->role.')');
+                                    $userWorkspaceLabels = $u->workspaces->map(fn ($workspace) => $workspace->name.' (#'.$workspace->id.', '.$workspace->pivot->role.')');
                                     $gmailConnection = $gmailConnections->get($u->id);
                                 @endphp
                                 <tr>
@@ -338,6 +342,66 @@
     </div>
 </div>
 
+<div class="modal fade" id="invite-user-modal" tabindex="-1" aria-labelledby="invite-user-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form action="{{ route('admin.users.invite') }}" method="POST">
+                @csrf
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="invite-user-label">Convidar usuário</h5>
+                        <div class="text-muted small">Vincula ao workspace e opcionalmente libera acesso à plataforma.</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">E-mail</label>
+                        <input type="email" name="email" class="form-control" required maxlength="255" value="{{ old('email') }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nome <span class="text-muted fw-normal">(novos usuários)</span></label>
+                        <input type="text" name="name" class="form-control" maxlength="255" value="{{ old('name') }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Workspace</label>
+                        <select name="workspace_id" class="form-select" required>
+                            <option value="">Selecione…</option>
+                            @foreach($workspaces as $workspace)
+                                <option value="{{ $workspace->id }}" @selected(old('workspace_id') == $workspace->id)>
+                                    {{ $workspace->name }} (#{{ $workspace->id }})
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Papel no workspace</label>
+                        <select name="role" class="form-select">
+                            <option value="member">Membro</option>
+                            <option value="admin">Admin</option>
+                            <option value="owner">Owner</option>
+                        </select>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input type="hidden" name="grant_platform_access" value="0">
+                        <input class="form-check-input" type="checkbox" name="grant_platform_access" id="invite-grant-access" value="1" checked>
+                        <label class="form-check-label" for="invite-grant-access">Liberar acesso à plataforma (1 ano)</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="hidden" name="send_reset_link" value="0">
+                        <input class="form-check-input" type="checkbox" name="send_reset_link" id="invite-send-reset" value="1" checked>
+                        <label class="form-check-label" for="invite-send-reset">Enviar link para definir senha (novos)</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Enviar convite</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="create-profile-modal" tabindex="-1" aria-labelledby="create-profile-label" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -433,7 +497,7 @@
         $notificationPrefs = $prefs['notifications'] ?? [];
         $aiPrefs = $prefs['ai'] ?? [];
         $roles = $u->roles->pluck('name');
-        $workspaces = $u->workspaces->map(fn ($workspace) => $workspace->name.' (#'.$workspace->id.', '.$workspace->pivot->role.')');
+        $userWorkspaceLabels = $u->workspaces->map(fn ($workspace) => $workspace->name.' (#'.$workspace->id.', '.$workspace->pivot->role.')');
         $gmailConnection = $gmailConnections->get($u->id);
         $telegramLinked = !empty($notificationPrefs['telegram_chat_id']) || !empty($notificationPrefs['telegram_destination_display']);
         $whatsappLinked = !empty($notificationPrefs['whatsapp_phone']);
@@ -494,9 +558,9 @@
                                     <div class="admin-users-diagnostic-label mb-2">Organização</div>
                                     <div class="small"><strong>Roles:</strong> {{ $roles->isNotEmpty() ? $roles->join(', ') : 'sem role' }}</div>
                                     <div class="small"><strong>Workspaces:</strong></div>
-                                    @if($workspaces->isNotEmpty())
+                                    @if($userWorkspaceLabels->isNotEmpty())
                                         <ul class="small mb-0 ps-3">
-                                            @foreach($workspaces as $workspaceLabel)
+                                            @foreach($userWorkspaceLabels as $workspaceLabel)
                                                 <li>{{ $workspaceLabel }}</li>
                                             @endforeach
                                         </ul>
@@ -646,4 +710,17 @@
         </div>
     </div>
 @endforeach
+
+@if($errors->has('email') || old('workspace_id'))
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const modal = document.getElementById('invite-user-modal');
+            if (modal) {
+                bootstrap.Modal.getOrCreateInstance(modal).show();
+            }
+        });
+    </script>
+    @endpush
+@endif
 @endsection
