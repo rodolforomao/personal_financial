@@ -4,6 +4,13 @@ use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('financial:daily')->dailyAt('06:00')->name('financial-daily-intelligence');
 
+if (config('financial.platform.auto_ensure_web_php', true) && app()->isProduction()) {
+    Schedule::command('platform:ensure-health --fix --probe')
+        ->hourly()
+        ->withoutOverlapping(5)
+        ->name('platform-ensure-health');
+}
+
 if (config('financial.integrations.telegram.scheduled_poll', false)) {
     Schedule::command('telegram:poll --once')
         ->everyMinute()

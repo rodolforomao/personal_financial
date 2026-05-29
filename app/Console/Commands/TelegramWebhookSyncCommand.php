@@ -3,18 +3,22 @@
 namespace App\Console\Commands;
 
 use App\Application\Services\PlatformOperationsGuide;
+use App\Console\Concerns\EnsuresPlatformHealthBeforeWebhook;
+use App\Core\Support\TelegramInboundGuard;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 
 class TelegramWebhookSyncCommand extends Command
 {
+    use EnsuresPlatformHealthBeforeWebhook;
+
     protected $signature = 'telegram:webhook-sync
                             {--url= : URL pública do webhook (padrão: APP_URL/api/v1/webhooks/telegram)}
                             {--drop : Remove o webhook do Telegram}';
 
     protected $description = 'Registra (ou remove) o webhook do bot Telegram para receber mensagens e criar lançamentos';
 
-    public function handle(): int
+    public function handle(TelegramInboundGuard $telegram): int
     {
         $token = config('financial.integrations.telegram.bot_token');
         if (! $token) {
@@ -40,9 +44,9 @@ class TelegramWebhookSyncCommand extends Command
         }
 
         $url = $this->option('url')
-            ?? rtrim((string) config('app.url'), '/').'/api/v1/webhooks/telegram';
+            ?? $telegram->expectedWebhookUrl();
 
-        if (! str_starts_with($url, 'https://')) {
+        if (! is_string($url) || ! str_starts_with($url, 'https://')) {
             $this->error('O Telegram exige webhook HTTPS (não aceita http://127.0.0.1).');
             $this->line('Use túnel (ngrok/cloudflared), defina APP_URL=https://... e rode de novo.');
             $this->line('Ou: php artisan telegram:webhook-sync --url=https://seu-tunel.ngrok.app/api/v1/webhooks/telegram');
@@ -50,26 +54,22 @@ class TelegramWebhookSyncCommand extends Command
             return self::FAILURE;
         }
 
-        $payload = [
-            'url' => $url,
-            'allowed_updates' => ['message', 'edited_message'],
-            'drop_pending_updates' => true,
-        ];
-
-        $secret = config('financial.integrations.telegram.webhook_secret');
-        if ($secret) {
-            $payload['secret_token'] = $secret;
+        if (! $this->ensurePlatformHealth()) {
+            return self::FAILURE;
         }
 
-        $response = Http::external()->post("https://api.telegram.org/bot{$token}/setWebhook", $payload);
+        $registered = $telegram->registerWebhook($url, dropPendingUpdates: true);
 
-        return $this->report($response->json(), "Webhook registrado: {$url}");
+        return $this->report($registered, "Webhook registrado: {$url}");
     }
 
-    protected function report(?array $body, string $successMessage): int
+    /**
+     * @param  array{ok: bool, error?: string, url?: string}  $registered
+     */
+    protected function report(array $registered, string $successMessage): int
     {
-        if (! ($body['ok'] ?? false)) {
-            $this->error($body['description'] ?? 'Falha na API do Telegram');
+        if (! ($registered['ok'] ?? false)) {
+            $this->error($registered['error'] ?? 'Falha na API do Telegram');
 
             return self::FAILURE;
         }

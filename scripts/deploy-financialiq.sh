@@ -325,6 +325,7 @@ cd "$REMOTE_DIR"
 sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan migrate --force
 sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan db:seed --class=Database\\Seeders\\FinancialPlatformSeeder --force
 sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan db:seed --class=Database\\Seeders\\NavigationMenuSeeder --force
+"$DEPLOY_PHP_BIN" artisan platform:ensure-health --fix --probe || true
 chown -R "$DEPLOY_WEB_USER:$DEPLOY_WEB_USER" storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
 sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan optimize

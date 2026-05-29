@@ -47,7 +47,7 @@ class HttpClientOptions
     protected static function isAllowedFile(string $path): bool
     {
         $openBaseDir = ini_get('open_basedir');
-        if (is_string($openBaseDir) && $openBaseDir !== '' && ! self::isWithinOpenBaseDir($path, $openBaseDir)) {
+        if (is_string($openBaseDir) && $openBaseDir !== '' && ! WebPhpAccessGuard::pathIsAllowed($path, $openBaseDir)) {
             return false;
         }
 
@@ -56,18 +56,6 @@ class HttpClientOptions
 
     protected static function isWithinOpenBaseDir(string $path, string $openBaseDir): bool
     {
-        $normalized = rtrim(str_replace('\\', '/', $path), '/');
-        foreach (explode(PATH_SEPARATOR, $openBaseDir) as $allowed) {
-            $allowed = rtrim(str_replace('\\', '/', $allowed), '/');
-            if ($allowed === '') {
-                continue;
-            }
-
-            if ($normalized === $allowed || str_starts_with($normalized, $allowed.'/')) {
-                return true;
-            }
-        }
-
-        return false;
+        return WebPhpAccessGuard::pathIsAllowed($path, $openBaseDir);
     }
 }

@@ -3,11 +3,13 @@
 namespace App\Console\Commands;
 
 use App\Application\Services\PlatformOperationsGuide;
+use App\Console\Concerns\EnsuresPlatformHealthBeforeWebhook;
 use Illuminate\Console\Command;
 use Modules\Integrations\Application\Services\EvolutionService;
 
 class EvolutionWebhookSyncCommand extends Command
 {
+    use EnsuresPlatformHealthBeforeWebhook;
     protected $signature = 'evolution:webhook-sync
                             {--url= : URL pública do webhook (padrão: APP_URL/api/v1/webhooks/whatsapp)}';
 
@@ -59,6 +61,10 @@ class EvolutionWebhookSyncCommand extends Command
             $this->warn('A URL do webhook usa localhost — o container Evolution NÃO consegue alcançar isso.');
             $this->line('Defina no .env: EVOLUTION_WEBHOOK_PUBLIC_URL=http://host.docker.internal:8000/api/v1/webhooks/whatsapp');
             $this->line('(Linux Docker com extra_hosts host-gateway — já está no docker-compose.yml)');
+        }
+
+        if (! $this->ensurePlatformHealth()) {
+            return self::FAILURE;
         }
 
         if (! $evolution->setWebhook($url)) {

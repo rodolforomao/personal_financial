@@ -1,6 +1,12 @@
 <?php
 
 return [
+    'platform' => [
+        // Corrige open_basedir (Hestia) e Telegram inbound em deploy/webhooks/scheduler.
+        'auto_ensure_web_php' => env('PLATFORM_AUTO_ENSURE_WEB_PHP', true),
+        'auto_ensure_telegram' => env('PLATFORM_AUTO_ENSURE_TELEGRAM', true),
+    ],
+
     'http' => [
         'verify_ssl' => env('HTTP_VERIFY_SSL', true),
         'ca_bundle' => env('CURL_CA_BUNDLE'),
