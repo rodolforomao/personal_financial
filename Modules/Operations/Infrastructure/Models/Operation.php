@@ -22,12 +22,16 @@ class Operation extends Model
         'slug',
         'description',
         'exclude_from_main_dashboard',
+        'partners_count',
+        'total_invested',
     ];
 
     protected function casts(): array
     {
         return [
             'exclude_from_main_dashboard' => 'boolean',
+            'partners_count' => 'integer',
+            'total_invested' => 'decimal:2',
         ];
     }
 

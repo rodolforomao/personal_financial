@@ -4,6 +4,7 @@ use App\Core\Http\Middleware\EnsurePermission;
 use App\Core\Http\Middleware\EnsureWorkspaceAccess;
 use App\Http\Middleware\EnsureActivePlatformAccess;
 use App\Http\Middleware\EnsureAdminRole;
+use App\Http\Middleware\PersistFilters;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => EnsurePermission::class,
             'admin' => EnsureAdminRole::class,
             'active.access' => EnsureActivePlatformAccess::class,
+            'persist-filters' => PersistFilters::class,
         ]);
         $middleware->api(prepend: [
             EnsureFrontendRequestsAreStateful::class,

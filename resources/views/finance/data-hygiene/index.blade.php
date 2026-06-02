@@ -19,7 +19,7 @@
     </li>
     <li class="nav-item">
         <a class="nav-link @if($tab === 'missing_unit') active @endif" href="{{ route('data-hygiene.index', ['tab' => 'missing_unit']) }}">
-            Sem apartamento <span class="badge text-bg-warning">{{ $audit['without_unit_in_ops_with_units'] }}</span>
+            Sem unidade <span class="badge text-bg-warning">{{ $audit['without_unit_in_ops_with_units'] }}</span>
         </a>
     </li>
 </ul>
@@ -39,7 +39,7 @@
         <div class="small-box text-bg-warning">
             <div class="inner">
                 <h3>{{ $audit['without_unit_in_ops_with_units'] }}</h3>
-                <p>Operação com aptos, lançamento sem unidade</p>
+                <p>Operação com unidades, lançamento sem unidade</p>
             </div>
             <a href="{{ route('data-hygiene.index', ['tab' => 'missing_unit']) }}" class="small-box-footer">Corrigir em lote <i class="bi bi-arrow-circle-right"></i></a>
         </div>
@@ -134,13 +134,13 @@
         </table>
     </div>
     <div class="card-footer small text-muted">
-        Renomeie unidades para apartamentos/produtos — empresas (sócios, clientes) ficam em <a href="{{ route('companies.index') }}">Empresas</a>.
+        Use unidades para subdivisões da operação (aptos, lojas, salas, etc.) — empresas (sócios, clientes) ficam em <a href="{{ route('companies.index') }}">Empresas</a>.
     </div>
 </div>
 @endif
 
 <div class="card">
-    <div class="card-header"><h3 class="card-title mb-0">Operações com apartamentos</h3></div>
+    <div class="card-header"><h3 class="card-title mb-0">Operações com unidades</h3></div>
     <ul class="list-group list-group-flush">
         @forelse($audit['operations_with_units'] as $op)
             <li class="list-group-item d-flex justify-content-between">
@@ -168,7 +168,7 @@
 
 @if($tab === 'missing_unit')
 <div class="alert alert-light border mb-3">
-    Selecione os lançamentos, escolha operação e apartamento, e aplique em lote. Opcional — você pode deixar sem unidade.
+    Selecione os lançamentos, escolha operação e unidade, e aplique em lote. Opcional — você pode deixar sem unidade.
 </div>
 
 <form action="{{ route('data-hygiene.bulk-assign') }}" method="POST" id="hygiene-bulk-form">
@@ -188,7 +188,7 @@
                 </select>
             </div>
             <div class="col-md-4">
-                <label class="form-label">Apartamento / unidade</label>
+                <label class="form-label">Unidade</label>
                 <select name="operation_unit_id" id="hygiene-unit-id" class="form-select">
                     <option value="">— Só operação —</option>
                 </select>

@@ -84,8 +84,22 @@
 </div>
 
 @if($canViewLogs)
+@php
+    $obsFiltersActive = !empty($filters['level']) || !empty($filters['search']) || !empty($filters['file']) || (int)($filters['days'] ?? 7) !== 7;
+@endphp
 <div class="card mb-4">
-    <div class="card-header"><h3 class="card-title">Filtros</h3></div>
+    <div class="card-header d-flex justify-content-between align-items-center filter-card-header @if(!$obsFiltersActive) collapsed @endif"
+         data-bs-toggle="collapse" data-bs-target="#obs-filter-collapse"
+         aria-expanded="{{ $obsFiltersActive ? 'true' : 'false' }}" aria-controls="obs-filter-collapse">
+        <h3 class="card-title mb-0">
+            Filtros
+            <i class="bi bi-chevron-down ms-1 filter-chevron" style="font-size:.75rem"></i>
+        </h3>
+        @if($obsFiltersActive)
+            <span class="badge text-bg-primary">Filtros ativos</span>
+        @endif
+    </div>
+    <div class="collapse @if($obsFiltersActive) show @endif" id="obs-filter-collapse">
     <div class="card-body">
         <form method="GET" class="row g-2 align-items-end">
             <div class="col-md-2">
@@ -122,6 +136,7 @@
                 <button type="submit" class="btn btn-sm btn-primary w-100">Filtrar</button>
             </div>
         </form>
+    </div>
     </div>
 </div>
 @else

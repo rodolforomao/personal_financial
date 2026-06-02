@@ -221,7 +221,7 @@ class ReceiptConfirmationService
             $lines[] = 'Operação: '.$d['operation_name'];
         }
         if (! empty($d['operation_unit_name'])) {
-            $lines[] = 'Apartamento/unidade: '.$d['operation_unit_name'];
+            $lines[] = 'Unidade: '.$d['operation_unit_name'];
         }
         if (! empty($d['caption_from_user']) || ! empty($d['supplement_from_user'])) {
             $lines[] = '(Legenda/descrição sua aplicada)';

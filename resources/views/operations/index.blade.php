@@ -18,7 +18,7 @@
                 <tr>
                     <th>Operação</th>
                     <th>Empresa</th>
-                    <th>Apartamentos</th>
+                    <th>Unidades</th>
                     <th></th>
                 </tr>
             </thead>

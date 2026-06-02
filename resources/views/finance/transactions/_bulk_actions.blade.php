@@ -15,6 +15,9 @@
         <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#bulkUpdateModal">
             <i class="bi bi-pencil-square"></i> Alterar em massa
         </button>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#bulkRecurringModal">
+            <i class="bi bi-arrow-repeat"></i> Recorrente
+        </button>
         <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#bulkDeleteModal">
             <i class="bi bi-trash"></i> Excluir
         </button>
@@ -126,6 +129,48 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary" id="bulk-update-submit">Aplicar nas selecionadas</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="bulkRecurringModal" tabindex="-1" aria-labelledby="bulkRecurringModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form action="{{ route('transactions.bulk-mark-recurring') }}" method="POST" id="bulk-recurring-form">
+            @csrf
+            <div id="bulk-recurring-ids-container"></div>
+            <div class="modal-content border-primary">
+                <div class="modal-header border-primary">
+                    <h5 class="modal-title" id="bulkRecurringModalLabel">
+                        <i class="bi bi-arrow-repeat"></i> Marcar como recorrente mensal
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Serão marcadas como <strong>recorrentes mensais</strong> as
+                        <strong id="bulk-recurring-count">0</strong> transação(ões) selecionada(s).
+                    </p>
+                    <div class="alert alert-info small mb-3">
+                        <i class="bi bi-info-circle"></i>
+                        Para cada receita ainda não vinculada, um registro de recorrência será criado automaticamente
+                        usando a descrição, valor e empresa da transação.
+                        Transações que não são do tipo <em>receita</em> ou que já possuem vínculo serão ignoradas.
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="alert_enabled" value="1"
+                               id="bulk-recurring-alert" checked>
+                        <label class="form-check-label" for="bulk-recurring-alert">
+                            <i class="bi bi-bell"></i> Ativar alerta mensal para as receitas criadas
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-arrow-repeat"></i> Marcar como recorrente
+                    </button>
                 </div>
             </div>
         </form>
@@ -252,6 +297,20 @@
 
     document.getElementById('bulk-delete-form')?.addEventListener('submit', function (e) {
         injectIds('bulk-delete-ids-container', selectedIds());
+        if (selectedIds().length === 0) {
+            e.preventDefault();
+            alert('Selecione ao menos uma transação na tabela.');
+        }
+    });
+
+    const bulkRecurringModal = document.getElementById('bulkRecurringModal');
+    const bulkRecurringCount = document.getElementById('bulk-recurring-count');
+    bulkRecurringModal?.addEventListener('show.bs.modal', function () {
+        const ids = selectedIds();
+        if (bulkRecurringCount) bulkRecurringCount.textContent = ids.length;
+    });
+    document.getElementById('bulk-recurring-form')?.addEventListener('submit', function (e) {
+        injectIds('bulk-recurring-ids-container', selectedIds());
         if (selectedIds().length === 0) {
             e.preventDefault();
             alert('Selecione ao menos uma transação na tabela.');

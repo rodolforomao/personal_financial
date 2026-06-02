@@ -16,9 +16,16 @@ class OperationSummaryService
      *     income: float,
      *     expense: float,
      *     net: float,
+     *     my_income: float,
+     *     my_net: float,
      *     income_count: int,
      *     expense_count: int,
-     *     units: list<array{unit: OperationUnit, income: float, expense: float, net: float}>
+     *     has_partners: bool,
+     *     partners_count: int|null,
+     *     total_invested: float|null,
+     *     total_income_alltime: float,
+     *     my_total_income_alltime: float,
+     *     units: list<array{unit: OperationUnit, income: float, expense: float, net: float, my_income: float, my_net: float}>
      * }
      */
     public function forOperation(Operation $operation, ?Carbon $month = null): array
@@ -26,6 +33,10 @@ class OperationSummaryService
         $month ??= now();
         $start = $month->copy()->startOfMonth();
         $end = $month->copy()->endOfMonth();
+
+        $partnersCount = $operation->partners_count && $operation->partners_count > 1
+            ? $operation->partners_count
+            : null;
 
         $transactions = Transaction::query()
             ->where('operation_id', $operation->id)
@@ -36,7 +47,10 @@ class OperationSummaryService
         $income = (float) $transactions->where('type', TransactionType::Income)->sum('amount');
         $expense = (float) $transactions->where('type', TransactionType::Expense)->sum('amount');
 
-        $units = $operation->units()->get()->map(function (OperationUnit $unit) use ($transactions) {
+        $myIncome = $partnersCount ? $income / $partnersCount : $income;
+        $myNet = $partnersCount ? ($income - $expense) / $partnersCount : ($income - $expense);
+
+        $units = $operation->units()->get()->map(function (OperationUnit $unit) use ($transactions, $partnersCount) {
             $unitRows = $transactions->where('operation_unit_id', $unit->id);
             $inc = (float) $unitRows->where('type', TransactionType::Income)->sum('amount');
             $exp = (float) $unitRows->where('type', TransactionType::Expense)->sum('amount');
@@ -46,6 +60,8 @@ class OperationSummaryService
                 'income' => $inc,
                 'expense' => $exp,
                 'net' => $inc - $exp,
+                'my_income' => $partnersCount ? $inc / $partnersCount : $inc,
+                'my_net' => $partnersCount ? ($inc - $exp) / $partnersCount : ($inc - $exp),
             ];
         })->all();
 
@@ -58,15 +74,30 @@ class OperationSummaryService
                 'income' => $inc,
                 'expense' => $exp,
                 'net' => $inc - $exp,
+                'my_income' => $partnersCount ? $inc / $partnersCount : $inc,
+                'my_net' => $partnersCount ? ($inc - $exp) / $partnersCount : ($inc - $exp),
             ];
         }
+
+        $totalIncomeAlltime = (float) Transaction::query()
+            ->where('operation_id', $operation->id)
+            ->whereIn('status', [TransactionStatus::Confirmed, TransactionStatus::Reconciled])
+            ->where('type', TransactionType::Income)
+            ->sum('amount');
 
         return [
             'income' => $income,
             'expense' => $expense,
             'net' => $income - $expense,
+            'my_income' => $myIncome,
+            'my_net' => $myNet,
             'income_count' => $transactions->where('type', TransactionType::Income)->count(),
             'expense_count' => $transactions->where('type', TransactionType::Expense)->count(),
+            'has_partners' => $partnersCount !== null,
+            'partners_count' => $partnersCount,
+            'total_invested' => $operation->total_invested ? (float) $operation->total_invested : null,
+            'total_income_alltime' => $totalIncomeAlltime,
+            'my_total_income_alltime' => $partnersCount ? $totalIncomeAlltime / $partnersCount : $totalIncomeAlltime,
             'units' => $units,
         ];
     }

@@ -8,6 +8,20 @@
 @endsection
 
 @section('content')
+@if(session('duplicated_from'))
+<div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+    <i class="bi bi-copy fs-5 flex-shrink-0"></i>
+    <div>
+        <strong>Transação duplicada com sucesso!</strong>
+        Esta é a cópia de
+        <a href="{{ route('transactions.edit', session('duplicated_from')) }}" class="alert-link">
+            #{{ session('duplicated_from') }}
+        </a>.
+        Revise os campos abaixo e salve quando estiver pronto.
+    </div>
+</div>
+@endif
+
 @if($transaction->source === 'telegram')
 <div class="alert alert-info">
     <i class="bi bi-telegram"></i> Criada via Telegram.
@@ -144,12 +158,23 @@
                 <button type="submit" class="btn btn-primary">Salvar alterações</button>
                 <a href="{{ route('transactions.index') }}" class="btn btn-secondary">Voltar</a>
             </div>
-            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTransactionModal">
-                <i class="bi bi-trash"></i> Excluir transação
-            </button>
+            <div class="d-flex gap-2">
+                <form method="POST" action="{{ route('transactions.duplicate', $transaction) }}">
+                    @csrf
+                    <button type="submit" class="btn btn-outline-secondary"
+                            title="Cria uma cópia com data de hoje e status Pendente">
+                        <i class="bi bi-copy"></i> Duplicar
+                    </button>
+                </form>
+                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTransactionModal">
+                    <i class="bi bi-trash"></i> Excluir transação
+                </button>
+            </div>
         </div>
     </form>
 </div>
+
+@include('finance.transactions._recurring_income', ['transaction' => $transaction])
 
 @include('finance.transactions._receipts', [
     'transaction' => $transaction,

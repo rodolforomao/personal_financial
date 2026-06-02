@@ -56,11 +56,21 @@
 
 @section('content')
 @php
-    $excludedIds = $dashboardFilter->normalizedExcludeIds();
-    $moneyMask = 'R$ •••••';
-    $sensitiveMoney = fn ($value) => 'R$ '.number_format((float) $value, 2, ',', '.');
+    $excludedIds     = $dashboardFilter->normalizedExcludeIds();
+    $moneyMask       = 'R$ •••••';
+    $sensitiveMoney  = fn ($value) => 'R$ '.number_format((float) $value, 2, ',', '.');
+
+    $riskLabel = ['low' => 'Baixo', 'medium' => 'Médio', 'high' => 'Alto', 'critical' => 'Crítico'];
+    $riskBadge = ['low' => 'success', 'medium' => 'warning', 'high' => 'warning', 'critical' => 'danger'];
+
+    $severityLabel = ['info' => 'Informação', 'warning' => 'Atenção', 'critical' => 'Crítico'];
+    $severityBadge = ['info' => 'info', 'warning' => 'warning', 'critical' => 'danger'];
+
+    $netPositive      = (float) $cashFlow['current_month']->net_cash_flow >= 0;
+    $expenseChartMonth = \Illuminate\Support\Carbon::parse($chartExpenses['month']['from'])->translatedFormat('F/y');
 @endphp
 
+{{-- Botão revelar valores --}}
 <div class="d-flex justify-content-end mb-3">
     <button type="button"
             class="btn btn-outline-secondary btn-sm"
@@ -72,63 +82,74 @@
     </button>
 </div>
 
-<div class="card card-outline card-secondary mb-3">
-    <div class="card-header py-2">
-        <h3 class="card-title mb-0"><i class="bi bi-funnel"></i> Escopo do painel</h3>
+{{-- Filtro de escopo (colapsável) --}}
+<div class="card card-outline card-secondary mb-3" id="filter-card">
+    <div class="card-header py-2 d-flex align-items-center gap-2"
+         role="button"
+         data-bs-toggle="collapse"
+         data-bs-target="#filter-body"
+         aria-expanded="false"
+         aria-controls="filter-body"
+         style="cursor:pointer; user-select:none">
+        <i class="bi bi-funnel flex-shrink-0"></i>
+        <span class="fw-semibold me-2">Escopo</span>
+        {{-- Resumo visível quando colapsado --}}
+        <span id="filter-summary" class="d-flex align-items-center gap-1 flex-wrap">
+            @if($dashboardFilter->includeAllOperations)
+                <span class="badge text-bg-secondary">Todas as operações</span>
+            @else
+                <span class="badge text-bg-secondary">Consolidado</span>
+            @endif
+            @foreach($operations->whereIn('id', $excludedIds) as $op)
+                <span class="badge text-bg-warning">− {{ $op->name }}</span>
+            @endforeach
+        </span>
+        <i class="bi bi-chevron-down ms-auto filter-chevron" style="transition: transform .2s"></i>
     </div>
-    <div class="card-body py-3">
-        <form action="{{ route('dashboard.filter') }}" method="POST" id="dashboard-filter-form">
-            @csrf
-            <div class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <div class="form-check form-switch mb-0">
-                        <input type="hidden" name="include_all_operations" value="0">
-                        <input class="form-check-input" type="checkbox" role="switch" name="include_all_operations" value="1"
-                               id="include-all-operations" @checked($dashboardFilter->includeAllOperations)>
-                        <label class="form-check-label" for="include-all-operations">
-                            Incluir <strong>todas</strong> as operações
-                        </label>
+    <div class="collapse" id="filter-body">
+        <div class="card-body py-3">
+            <form action="{{ route('dashboard.filter') }}" method="POST" id="dashboard-filter-form">
+                @csrf
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <div class="form-check form-switch mb-0">
+                            <input type="hidden" name="include_all_operations" value="0">
+                            <input class="form-check-input" type="checkbox" role="switch" name="include_all_operations" value="1"
+                                   id="include-all-operations" @checked($dashboardFilter->includeAllOperations)>
+                            <label class="form-check-label" for="include-all-operations">
+                                Incluir <strong>todas</strong> as operações
+                            </label>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            Desligado: exibe apenas lançamentos gerais e operações marcadas como visíveis no dashboard
+                            (ver <a href="{{ route('operations.index') }}">Operações</a>).
+                        </small>
                     </div>
-                    <small class="text-muted d-block mt-1">
-                        Desligado: só lançamentos gerais e operações marcadas em
-                        <a href="{{ route('operations.index') }}">Operações</a> como visíveis no dashboard.
-                    </small>
+                    <div class="col-md-6">
+                        <label class="form-label mb-1" for="dashboard-exclude-operations">Ocultar operações deste painel</label>
+                        <select name="exclude_operation_ids[]" id="dashboard-exclude-operations" class="form-select" multiple
+                                data-placeholder="Nenhuma — mostrar conforme o escopo acima">
+                            @foreach($operations as $op)
+                                <option value="{{ $op->id }}" @selected(in_array($op->id, $excludedIds, true))>
+                                    {{ $op->name }}
+                                    @unless($op->exclude_from_main_dashboard)
+                                        (sempre no consolidado)
+                                    @endunless
+                                </option>
+                            @endforeach
+                        </select>
+                        <small class="text-muted">Use para tirar temporariamente um negócio do CFO sem alterar a operação.</small>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">Aplicar</button>
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label mb-1" for="dashboard-exclude-operations">Ocultar operações deste painel</label>
-                    <select name="exclude_operation_ids[]" id="dashboard-exclude-operations" class="form-select" multiple
-                            data-placeholder="Nenhuma — mostrar conforme o escopo acima">
-                        @foreach($operations as $op)
-                            <option value="{{ $op->id }}" @selected(in_array($op->id, $excludedIds, true))>
-                                {{ $op->name }}
-                                @unless($op->exclude_from_main_dashboard)
-                                    (sempre no consolidado)
-                                @endunless
-                            </option>
-                        @endforeach
-                    </select>
-                    <small class="text-muted">Use para tirar temporariamente um negócio do CFO sem alterar a operação.</small>
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">Aplicar</button>
-                </div>
-            </div>
-        </form>
-        @if(!$dashboardFilter->includeAllOperations || $excludedIds !== [])
-            <p class="text-muted small mb-0 mt-2">
-                @if(!$dashboardFilter->includeAllOperations)
-                    Modo <strong>consolidado</strong>.
-                @else
-                    Modo <strong>todas as operações</strong>.
-                @endif
-                @if($excludedIds !== [])
-                    Ocultas: {{ $operations->whereIn('id', $excludedIds)->pluck('name')->join(', ') }}.
-                @endif
-            </p>
-        @endif
+            </form>
+        </div>
     </div>
 </div>
 
+{{-- Alertas de saneamento / CLT --}}
 @php
     $hygienePending = ($hygieneAudit['without_unit_in_ops_with_units'] ?? 0) > 0
         || count($hygieneAudit['wrong_company_types'] ?? []) > 0
@@ -138,7 +159,7 @@
 <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
         <i class="bi bi-clipboard-check"></i>
-        Há dados para revisar (empresas, operação Geral ou lançamentos sem apartamento).
+        Há dados para revisar (empresas, operação Geral ou lançamentos sem unidade).
     </div>
     <a href="{{ route('data-hygiene.index') }}" class="btn btn-info btn-sm">Abrir saneamento</a>
 </div>
@@ -152,12 +173,20 @@
     <a href="{{ route('clt-salaries.index') }}" class="btn btn-warning btn-sm">Confirmar agora</a>
 </div>
 @endif
+
+{{-- KPIs do mês --}}
 <div class="row g-3 mb-3 dashboard-summary">
     <div class="col-lg-3 col-6">
         <div class="small-box text-bg-success">
             <div class="inner">
                 <h3 class="sensitive-value" data-sensitive-value="{{ $sensitiveMoney($cashFlow['current_month']->total_income) }}">{{ $moneyMask }}</h3>
-                <p>Receitas (mês)</p>
+                <p class="mb-0">Receitas (mês)</p>
+                @php $pct = $cashFlow['income_change_pct']; @endphp
+                @if($pct != 0)
+                    <small class="opacity-75">
+                        {{ $pct > 0 ? '▲' : '▼' }} {{ number_format(abs($pct), 1) }}% vs mês anterior
+                    </small>
+                @endif
             </div>
             <i class="small-box-icon bi bi-arrow-down-circle"></i>
         </div>
@@ -166,16 +195,22 @@
         <div class="small-box text-bg-danger">
             <div class="inner">
                 <h3 class="sensitive-value" data-sensitive-value="{{ $sensitiveMoney($cashFlow['current_month']->total_expense) }}">{{ $moneyMask }}</h3>
-                <p>Despesas (mês)</p>
+                <p class="mb-0">Despesas (mês)</p>
+                @php $pct = $cashFlow['expense_change_pct']; @endphp
+                @if($pct != 0)
+                    <small class="opacity-75">
+                        {{ $pct > 0 ? '▲' : '▼' }} {{ number_format(abs($pct), 1) }}% vs mês anterior
+                    </small>
+                @endif
             </div>
             <i class="small-box-icon bi bi-arrow-up-circle"></i>
         </div>
     </div>
     <div class="col-lg-3 col-6">
-        <div class="small-box text-bg-primary">
+        <div class="small-box text-bg-{{ $netPositive ? 'primary' : 'danger' }}">
             <div class="inner">
                 <h3 class="sensitive-value" data-sensitive-value="{{ $sensitiveMoney($cashFlow['current_month']->net_cash_flow) }}">{{ $moneyMask }}</h3>
-                <p>Fluxo líquido</p>
+                <p>Fluxo líquido (mês)</p>
             </div>
             <i class="small-box-icon bi bi-graph-up"></i>
         </div>
@@ -184,17 +219,20 @@
         <div class="small-box text-bg-warning">
             <div class="inner">
                 <h3 class="sensitive-value" data-sensitive-value="{{ $sensitiveMoney($patrimony) }}">{{ $moneyMask }}</h3>
-                <p>Patrimônio</p>
+                <p>Patrimônio total</p>
             </div>
             <i class="small-box-icon bi bi-bank"></i>
         </div>
     </div>
 </div>
 
-<div class="row">
+{{-- Gráficos: Fluxo de caixa + Despesas por categoria --}}
+<div class="row mb-3">
     <div class="col-lg-8">
         <div class="card">
-            <div class="card-header"><h3 class="card-title">Fluxo de caixa (6 meses)</h3></div>
+            <div class="card-header">
+                <h3 class="card-title">Fluxo de caixa — últimos 6 meses</h3>
+            </div>
             <div class="card-body">
                 <canvas id="chart-cashflow" class="sensitive-visual" height="120"></canvas>
             </div>
@@ -202,18 +240,22 @@
     </div>
     <div class="col-lg-4">
         <div class="card">
-            <div class="card-header"><h3 class="card-title">Despesas por categoria</h3></div>
+            <div class="card-header">
+                <h3 class="card-title">Despesas por categoria</h3>
+                <span class="card-tools text-muted small">{{ $expenseChartMonth }}</span>
+            </div>
             <div class="card-body">
                 @if(count($chartExpenses['labels']) > 0)
                     <canvas id="chart-expenses" class="sensitive-visual" height="200"></canvas>
                 @else
-                    <p class="text-muted mb-0">Sem despesas categorizadas neste mês.</p>
+                    <p class="text-muted mb-0">Sem despesas categorizadas em {{ $expenseChartMonth }}.</p>
                 @endif
             </div>
         </div>
     </div>
 </div>
 
+{{-- Modal detalhe de categoria de despesa --}}
 <div class="modal fade" id="expense-category-modal" tabindex="-1" aria-labelledby="expense-category-modal-title" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -235,7 +277,7 @@
                     <dt class="col-sm-5">Transações</dt>
                     <dd class="col-sm-7" id="expense-category-count">—</dd>
 
-                    <dt class="col-sm-5">Período do gráfico</dt>
+                    <dt class="col-sm-5">Período</dt>
                     <dd class="col-sm-7" id="expense-category-period">—</dd>
                 </dl>
             </div>
@@ -249,33 +291,39 @@
     </div>
 </div>
 
+{{-- Gráfico de patrimônio --}}
 @if(count($chartPatrimony['labels']) > 0)
-<div class="row">
-    <div class="col-md-6">
+<div class="row mb-3">
+    <div class="col-12">
         <div class="card">
-            <div class="card-header"><h3 class="card-title">Patrimônio por item</h3></div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0">Composição do patrimônio</h3>
+                <span class="text-muted small">
+                    Total: <strong class="sensitive-value" data-sensitive-value="{{ $sensitiveMoney($chartPatrimony['total']) }}">{{ $moneyMask }}</strong>
+                    &nbsp;·&nbsp;
+                    <a href="{{ route('assets.index') }}">Gerenciar</a>
+                </span>
+            </div>
             <div class="card-body">
-                <canvas id="chart-patrimony" class="sensitive-visual" height="140"></canvas>
+                <canvas id="chart-patrimony" class="sensitive-visual" height="80"></canvas>
             </div>
         </div>
     </div>
-    <div class="col-md-6 d-flex align-items-center">
-        <p class="mb-0 text-muted">
-            Total: <strong class="sensitive-value" data-sensitive-value="{{ $sensitiveMoney($chartPatrimony['total']) }}">{{ $moneyMask }}</strong> —
-            <a href="{{ route('assets.index') }}">Gerenciar patrimônio</a>
-        </p>
-    </div>
 </div>
 @else
-<div class="alert alert-light border">
+<div class="alert alert-light border mb-3">
     Cadastre itens em <a href="{{ route('assets.index') }}">Patrimônio</a> para ver o gráfico de composição.
 </div>
 @endif
 
+{{-- Transações recentes + Previsão + Alertas --}}
 <div class="row">
     <div class="col-md-8">
         <div class="card">
-            <div class="card-header"><h3 class="card-title">Transações recentes</h3></div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0">Transações recentes</h3>
+                <a href="{{ route('transactions.index') }}" class="btn btn-sm btn-outline-secondary">Ver todas</a>
+            </div>
             <div class="card-body table-responsive p-0">
                 <table class="table table-hover mb-0">
                     <thead>
@@ -291,7 +339,11 @@
                         @forelse($recentTransactions as $tx)
                             <tr>
                                 <td>{{ $tx->transaction_date->format('d/m/Y') }}</td>
-                                <td>{{ $tx->description }}</td>
+                                <td>
+                                    <a href="{{ route('transactions.edit', $tx) }}" class="text-reset text-decoration-none">
+                                        {{ $tx->description }}
+                                    </a>
+                                </td>
                                 <td>
                                     @if($tx->operation)
                                         <span class="badge text-bg-secondary">{{ $tx->operation->name }}</span>
@@ -300,14 +352,14 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <span class="badge text-bg-{{ $tx->type->value === 'income' ? 'success' : 'danger' }}">
-                                        {{ $tx->type->value }}
+                                    <span class="badge text-bg-{{ $tx->type === \App\Core\Enums\TransactionType::Income ? 'success' : 'danger' }}">
+                                        {{ $tx->type->label() }}
                                     </span>
                                 </td>
                                 <td class="text-end sensitive-value" data-sensitive-value="{{ $sensitiveMoney($tx->amount) }}">{{ $moneyMask }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="text-center text-muted">Nenhuma transação</td></tr>
+                            <tr><td colspan="5" class="text-center text-muted py-3">Nenhuma transação</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -315,26 +367,55 @@
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card card-outline card-{{ $forecast->risk_level === 'critical' ? 'danger' : 'info' }}">
-            <div class="card-header"><h3 class="card-title">Previsão 90 dias</h3></div>
+        {{-- Previsão 90 dias --}}
+        @php
+            $rLevel = $forecast->risk_level;
+            $rText  = $riskLabel[$rLevel]  ?? ucfirst($rLevel);
+            $rColor = $riskBadge[$rLevel]  ?? 'secondary';
+        @endphp
+        <div class="card card-outline card-{{ $rColor }} mb-3">
+            <div class="card-header">
+                <h3 class="card-title">Previsão — próximos 90 dias</h3>
+            </div>
             <div class="card-body">
-                <p><strong>Saldo projetado:</strong> <span class="sensitive-value" data-sensitive-value="{{ $sensitiveMoney($forecast->projected_balance) }}">{{ $moneyMask }}</span></p>
-                <p><strong>Risco:</strong> <span class="badge text-bg-secondary">{{ $forecast->risk_level }}</span></p>
+                <dl class="row mb-0 small">
+                    <dt class="col-6 fw-normal text-muted">Receita projetada</dt>
+                    <dd class="col-6 text-end sensitive-value" data-sensitive-value="{{ $sensitiveMoney($forecast->projected_income) }}">{{ $moneyMask }}</dd>
+
+                    <dt class="col-6 fw-normal text-muted">Despesa projetada</dt>
+                    <dd class="col-6 text-end sensitive-value" data-sensitive-value="{{ $sensitiveMoney($forecast->projected_expense) }}">{{ $moneyMask }}</dd>
+
+                    <dt class="col-6 fw-semibold">Saldo projetado</dt>
+                    <dd class="col-6 text-end fw-semibold sensitive-value" data-sensitive-value="{{ $sensitiveMoney($forecast->projected_balance) }}">{{ $moneyMask }}</dd>
+
+                    <dt class="col-6 fw-normal text-muted mt-1">Risco</dt>
+                    <dd class="col-6 text-end mt-1">
+                        <span class="badge text-bg-{{ $rColor }}">{{ $rText }}</span>
+                    </dd>
+                </dl>
             </div>
         </div>
+
+        {{-- Alertas --}}
         <div class="card">
-            <div class="card-header d-flex justify-content-between">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h3 class="card-title mb-0">Alertas</h3>
-                <a href="{{ route('alerts.index') }}" class="btn btn-sm btn-outline-primary">Ver</a>
+                <a href="{{ route('alerts.index') }}" class="btn btn-sm btn-outline-primary">Ver todos</a>
             </div>
             <ul class="list-group list-group-flush">
                 @forelse($openAlerts as $alert)
-                    <li class="list-group-item">
-                        <small class="text-muted">{{ $alert->severity->value }}</small><br>
-                        {{ $alert->title }}
-                    </li>
+                    @php
+                        $sev      = $alert->severity->value;
+                        $sevText  = $severityLabel[$sev]  ?? ucfirst($sev);
+                        $sevColor = $severityBadge[$sev]  ?? 'secondary';
+                    @endphp
+                    <a href="{{ route('alerts.index') }}#alert-{{ $alert->id }}"
+                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-2 py-2 text-decoration-none">
+                        <span class="text-body">{{ $alert->title }}</span>
+                        <span class="badge text-bg-{{ $sevColor }} flex-shrink-0">{{ $sevText }}</span>
+                    </a>
                 @empty
-                    <li class="list-group-item text-muted">Nenhum alerta aberto</li>
+                    <li class="list-group-item text-muted py-3 text-center">Nenhum alerta aberto</li>
                 @endforelse
             </ul>
         </div>
@@ -343,6 +424,29 @@
 @endsection
 
 @push('scripts')
+<script>
+(function () {
+    const STORAGE_KEY = 'dashboard-filter-open';
+    const collapseEl = document.getElementById('filter-body');
+    const chevron    = document.querySelector('.filter-chevron');
+
+    if (!collapseEl) return;
+
+    function setChevron(open) {
+        if (chevron) chevron.style.transform = open ? 'rotate(180deg)' : '';
+    }
+
+    // Restaura estado salvo (padrão: fechado)
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === 'open') {
+        collapseEl.classList.add('show');
+        setChevron(true);
+    }
+
+    collapseEl.addEventListener('show.bs.collapse',  () => { localStorage.setItem(STORAGE_KEY, 'open');   setChevron(true);  });
+    collapseEl.addEventListener('hide.bs.collapse',  () => { localStorage.setItem(STORAGE_KEY, 'closed'); setChevron(false); });
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/i18n/pt-BR.js"></script>
@@ -403,6 +507,10 @@
 </script>
 <script>
 (function () {
+    const brl = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v);
+    const brlFull = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+
+    // Gráfico: Fluxo de caixa (6 meses)
     const cash = @json($chartCashFlow);
     const elCf = document.getElementById('chart-cashflow');
     if (elCf) {
@@ -411,29 +519,43 @@
             data: {
                 labels: cash.labels,
                 datasets: [
-                    { label: 'Receitas', data: cash.income, backgroundColor: 'rgba(25, 135, 84, 0.7)' },
-                    { label: 'Despesas', data: cash.expense, backgroundColor: 'rgba(220, 53, 69, 0.7)' },
-                    { label: 'Líquido', data: cash.net, type: 'line', borderColor: '#0d6efd', tension: 0.3, fill: false },
+                    { label: 'Receitas',  data: cash.income,   backgroundColor: 'rgba(25, 135, 84, 0.7)' },
+                    { label: 'Despesas',  data: cash.expense,  backgroundColor: 'rgba(220, 53, 69, 0.7)' },
+                    { label: 'Líquido',   data: cash.net,      type: 'line', borderColor: '#0d6efd', tension: 0.3, fill: false },
                 ],
             },
-            options: { responsive: true, scales: { y: { beginAtZero: true } } },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: (v) => brl(v) },
+                    },
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.dataset.label}: ${brlFull(ctx.parsed.y ?? ctx.raw)}`,
+                        },
+                    },
+                },
+            },
         });
     }
 
+    // Gráfico: Despesas por categoria
     const exp = @json($chartExpenses);
     const elEx = document.getElementById('chart-expenses');
-    const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
     const transactionsUrl = "{{ route('transactions.index') }}";
+
     function expenseCategoryTransactionUrl(index) {
         const params = new URLSearchParams({ type: 'expense' });
         const categoryId = (exp.category_ids || [])[index] ?? null;
-
         if (categoryId) {
             params.set('category_id', categoryId);
         } else {
             params.set('missing', 'category');
         }
-
         return `${transactionsUrl}?${params.toString()}`;
     }
 
@@ -446,9 +568,11 @@
 
         document.getElementById('expense-category-modal-title').textContent = label;
         document.getElementById('expense-category-name').textContent = label;
+
         const categoryValue = document.getElementById('expense-category-value');
-        categoryValue.dataset.sensitiveValue = money.format(value);
-        categoryValue.textContent = window.dashboardSensitiveValuesVisible ? money.format(value) : window.dashboardMoneyMask;
+        categoryValue.dataset.sensitiveValue = brlFull(value);
+        categoryValue.textContent = window.dashboardSensitiveValuesVisible ? brlFull(value) : window.dashboardMoneyMask;
+
         document.getElementById('expense-category-percent').textContent = `${pct}% do total exibido`;
         document.getElementById('expense-category-count').textContent = count === 1 ? '1 transação' : `${count} transações`;
         document.getElementById('expense-category-period').textContent = `${formatDate(exp.month.from)} a ${formatDate(exp.month.to)}`;
@@ -462,8 +586,7 @@
 
     function formatDate(value) {
         const [year, month, day] = String(value || '').split('-');
-
-        return year && month && day ? `${day}/${month}/${year}` : 'Mês atual';
+        return year && month && day ? `${day}/${month}/${year}` : '—';
     }
 
     if (elEx && exp.labels.length) {
@@ -471,7 +594,10 @@
             type: 'doughnut',
             data: {
                 labels: exp.labels,
-                datasets: [{ data: exp.values, backgroundColor: ['#0d6efd','#6610f2','#d63384','#fd7e14','#ffc107','#198754','#20c997','#6c757d'] }],
+                datasets: [{
+                    data: exp.values,
+                    backgroundColor: ['#0d6efd','#6610f2','#d63384','#fd7e14','#ffc107','#198754','#20c997','#6c757d'],
+                }],
             },
             options: {
                 responsive: true,
@@ -492,10 +618,7 @@
                                 const total = values.reduce((sum, v) => sum + v, 0);
                                 const value = Number(context.parsed ?? context.raw ?? 0);
                                 const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
-                                const fmt = value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                const name = context.label || '';
-
-                                return `${name}: ${fmt} (${pct}%)`;
+                                return `${context.label}: ${brlFull(value)} (${pct}%)`;
                             },
                         },
                     },
@@ -504,6 +627,7 @@
         });
     }
 
+    // Gráfico: Patrimônio
     const pat = @json($chartPatrimony);
     const elPat = document.getElementById('chart-patrimony');
     if (elPat && pat.labels.length) {
@@ -511,9 +635,27 @@
             type: 'pie',
             data: {
                 labels: pat.labels,
-                datasets: [{ data: pat.values, backgroundColor: ['#ffc107','#0dcaf0','#198754','#6f42c1','#dc3545'] }],
+                datasets: [{
+                    data: pat.values,
+                    backgroundColor: ['#ffc107','#0dcaf0','#198754','#6f42c1','#dc3545','#0d6efd','#fd7e14','#20c997'],
+                }],
             },
-            options: { responsive: true },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const total = ctx.dataset.data.reduce((s, v) => s + Number(v), 0);
+                                const value = Number(ctx.parsed ?? ctx.raw ?? 0);
+                                const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                                return `${ctx.label}: ${brlFull(value)} (${pct}%)`;
+                            },
+                        },
+                    },
+                },
+            },
         });
     }
 })();

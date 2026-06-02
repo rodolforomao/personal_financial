@@ -43,12 +43,18 @@
 @endif
 
 <div class="card mb-3">
-    <div class="card-header py-2 d-flex justify-content-between align-items-center">
-        <h3 class="card-title mb-0 small"><i class="bi bi-funnel"></i> Filtros</h3>
+    <div class="card-header py-2 d-flex justify-content-between align-items-center filter-card-header @if(!($filtersActive ?? false)) collapsed @endif"
+         data-bs-toggle="collapse" data-bs-target="#tx-filter-collapse"
+         aria-expanded="{{ ($filtersActive ?? false) ? 'true' : 'false' }}" aria-controls="tx-filter-collapse">
+        <h3 class="card-title mb-0 small">
+            <i class="bi bi-funnel"></i> Filtros
+            <i class="bi bi-chevron-down ms-1 filter-chevron" style="font-size:.75rem"></i>
+        </h3>
         @if($filtersActive ?? false)
             <span class="badge text-bg-primary">Filtros ativos</span>
         @endif
     </div>
+    <div class="collapse @if($filtersActive ?? false) show @endif" id="tx-filter-collapse">
     <div class="card-body py-2">
         <form method="GET" id="tx-filter-form">
             @if(request('statement_import_id'))
@@ -101,7 +107,7 @@
                     </select>
                 </div>
                 <div class="col-md-4 col-lg-3">
-                    <label class="form-label small mb-0">Unidade (apto)</label>
+                    <label class="form-label small mb-0">Unidade</label>
                     <select name="operation_unit_id" id="filter-operation-unit-id" class="form-select form-select-sm"
                             @disabled(!request('operation_id'))>
                         <option value="">Todas</option>
@@ -190,10 +196,11 @@
                 </div>
                 <div class="col-md-4 col-lg-3 d-flex gap-1 align-items-end">
                     <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Filtrar</button>
-                    <a href="{{ route('transactions.index') }}" class="btn btn-sm btn-outline-secondary">Limpar</a>
+                    <a href="{{ route('transactions.index', ['clear' => 1]) }}" class="btn btn-sm btn-outline-secondary">Limpar</a>
                 </div>
             </div>
         </form>
+    </div>
     </div>
 </div>
 
@@ -208,9 +215,11 @@
         <h3 class="card-title mb-0">Lançamentos</h3>
         <div class="card-tools d-flex gap-1">
             <form action="{{ route('transactions.bulk-categorize') }}" method="POST" class="mb-0 d-inline"
-                onsubmit="return confirm('Categorizar automaticamente todas sem categoria?');">
+                onsubmit="return confirm('Auto-categorizar transações sem categoria e vincular operações/empresas automaticamente?');">
                 @csrf
-                <button type="submit" class="btn btn-warning btn-sm" @disabled(($uncategorizedCount ?? 0) === 0)>
+                <button type="submit" class="btn btn-warning btn-sm"
+                    @disabled(($uncategorizedCount ?? 0) === 0 && ($operationsToAssignCount ?? 0) === 0)
+                    title="@if(($uncategorizedCount ?? 0) > 0 || ($operationsToAssignCount ?? 0) > 0){{ ($uncategorizedCount ?? 0) }} sem categoria · {{ ($operationsToAssignCount ?? 0) }} sem operação a vincular @else Nada a processar @endif">
                     <i class="bi bi-magic"></i> Auto-categorizar
                 </button>
             </form>
@@ -244,6 +253,9 @@
                         <td>{{ $tx->transaction_date->format('d/m/Y') }}</td>
                         <td>
                             {{ $tx->description }}
+                            @if($tx->is_recurring)
+                                <i class="bi bi-arrow-repeat text-primary ms-1" title="Receita recorrente mensal"></i>
+                            @endif
                             @if(($tx->documents_count ?? 0) > 0)
                                 <span class="badge text-bg-info ms-1"><i class="bi bi-paperclip"></i> {{ $tx->documents_count }}</span>
                             @endif

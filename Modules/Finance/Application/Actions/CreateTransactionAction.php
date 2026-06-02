@@ -8,6 +8,7 @@ use Modules\Finance\Domain\Events\TransactionCreated;
 use Modules\Finance\Infrastructure\Models\RecurringItem;
 use Modules\Finance\Infrastructure\Models\Transaction;
 use Modules\Finance\Infrastructure\Repositories\TransactionRepository;
+use Modules\Operations\Infrastructure\Models\Operation;
 
 class CreateTransactionAction
 {
@@ -56,6 +57,16 @@ class CreateTransactionAction
             if ($suggestion) {
                 $attributes['category_id'] = $suggestion['category_id'];
                 $attributes['categorization_confidence'] = $suggestion['confidence'];
+            }
+        }
+
+        if (! $data->operationId && $data->companyId && in_array($data->source, $autoCategorizeSources, true)) {
+            $operation = Operation::query()
+                ->where('workspace_id', $data->workspaceId)
+                ->where('company_id', $data->companyId)
+                ->first();
+            if ($operation) {
+                $attributes['operation_id'] = $operation->id;
             }
         }
 

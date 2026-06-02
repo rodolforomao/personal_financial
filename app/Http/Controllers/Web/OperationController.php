@@ -49,6 +49,8 @@ class OperationController extends Controller
             'name' => 'required|string|max:255',
             'company_id' => 'nullable|integer|exists:companies,id',
             'description' => 'nullable|string|max:2000',
+            'partners_count' => 'nullable|integer|min:2|max:99',
+            'total_invested' => 'nullable|numeric|min:0',
         ]);
 
         $slug = $this->uniqueSlug($workspaceId, Str::slug($validated['name']));
@@ -60,11 +62,13 @@ class OperationController extends Controller
             'slug' => $slug,
             'description' => $validated['description'] ?? null,
             'exclude_from_main_dashboard' => true,
+            'partners_count' => $validated['partners_count'] ?? null,
+            'total_invested' => $validated['total_invested'] ?? null,
         ]);
 
         return redirect()
             ->route('operations.show', $operation)
-            ->with('success', 'Operação criada. Cadastre os apartamentos abaixo.');
+            ->with('success', 'Operação criada. Cadastre as unidades abaixo.');
     }
 
     public function show(
@@ -110,6 +114,8 @@ class OperationController extends Controller
             'company_id' => 'nullable|integer|exists:companies,id',
             'description' => 'nullable|string|max:2000',
             'exclude_from_main_dashboard' => 'nullable|boolean',
+            'partners_count' => 'nullable|integer|min:2|max:99',
+            'total_invested' => 'nullable|numeric|min:0',
         ]);
 
         $operation->update([
@@ -117,6 +123,8 @@ class OperationController extends Controller
             'company_id' => $validated['company_id'] ?? null,
             'description' => $validated['description'] ?? null,
             'exclude_from_main_dashboard' => $request->boolean('exclude_from_main_dashboard'),
+            'partners_count' => $validated['partners_count'] ?? null,
+            'total_invested' => isset($validated['total_invested']) && $validated['total_invested'] !== '' ? $validated['total_invested'] : null,
         ]);
 
         return redirect()
@@ -144,7 +152,7 @@ class OperationController extends Controller
 
         return redirect()
             ->route('operations.show', $operation)
-            ->with('success', 'Apartamento cadastrado.');
+            ->with('success', 'Unidade cadastrada.');
     }
 
     public function destroyUnit(Request $request, Operation $operation, OperationUnit $unit): RedirectResponse
@@ -156,14 +164,14 @@ class OperationController extends Controller
         }
 
         if ($unit->transactions()->exists()) {
-            return back()->with('error', 'Não é possível remover: há lançamentos vinculados a este apartamento.');
+            return back()->with('error', 'Não é possível remover: há lançamentos vinculados a esta unidade.');
         }
 
         $unit->delete();
 
         return redirect()
             ->route('operations.show', $operation)
-            ->with('success', 'Apartamento removido.');
+            ->with('success', 'Unidade removida.');
     }
 
     protected function uniqueSlug(int $workspaceId, string $base): string

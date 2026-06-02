@@ -17,6 +17,7 @@ use App\Http\Controllers\Web\IntegrationSettingsController;
 use App\Http\Controllers\Web\ObservabilityController;
 use App\Http\Controllers\Web\OperationController;
 use App\Http\Controllers\Web\PlatformSettingsController;
+use App\Http\Controllers\Web\RecurringIncomeController;
 use App\Http\Controllers\Web\PlatformUserController;
 use App\Http\Controllers\Web\ProjectController;
 use App\Http\Controllers\Web\ReceiptExtractController;
@@ -67,7 +68,7 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::post('dashboard/filter', [DashboardController::class, 'updateFilter'])->name('dashboard.filter');
 
-        Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+        Route::get('reports', [ReportController::class, 'index'])->name('reports.index')->middleware('persist-filters');
         Route::get('reports/export', [ReportController::class, 'export'])->name('reports.export');
 
         Route::get('data-hygiene', [DataHygieneController::class, 'index'])->name('data-hygiene.index');
@@ -84,10 +85,11 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::patch('categorization-rules/{categorizationRule}/toggle', [CategorizationRuleController::class, 'toggle'])->name('categorization-rules.toggle');
         Route::delete('categorization-rules/{categorizationRule}', [CategorizationRuleController::class, 'destroy'])->name('categorization-rules.destroy');
 
-        Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');
+        Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index')->middleware('persist-filters');
         Route::post('transactions/bulk-categorize', [TransactionController::class, 'bulkCategorize'])->name('transactions.bulk-categorize');
         Route::post('transactions/bulk-update', [TransactionController::class, 'bulkUpdate'])->name('transactions.bulk-update');
         Route::post('transactions/bulk-destroy', [TransactionController::class, 'bulkDestroy'])->name('transactions.bulk-destroy');
+        Route::post('transactions/bulk-mark-recurring', [TransactionController::class, 'bulkMarkRecurring'])->name('transactions.bulk-mark-recurring');
         Route::post('transactions/remove-estorno-pairs', [TransactionController::class, 'removeEstornoPairs'])->name('transactions.remove-estorno-pairs');
         Route::get('transactions/create', [TransactionController::class, 'create'])->name('transactions.create');
         Route::post('transactions/receipt-extract/preview', [ReceiptExtractController::class, 'preview'])->name('transactions.receipt-extract.preview');
@@ -96,7 +98,10 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::get('transactions/{transaction}/edit', [TransactionController::class, 'edit'])->name('transactions.edit');
         Route::put('transactions/{transaction}', [TransactionController::class, 'update'])->name('transactions.update');
         Route::delete('transactions/{transaction}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
+        Route::post('transactions/{transaction}/duplicate', [TransactionController::class, 'duplicate'])->name('transactions.duplicate');
         Route::post('transactions/{transaction}/mirror-personal', [TransactionController::class, 'createPersonalMirror'])->name('transactions.mirror-personal');
+        Route::post('transactions/{transaction}/criar-recorrente', [TransactionController::class, 'createRecurring'])->name('transactions.create-recurring');
+        Route::post('transactions/{transaction}/desvincular-recorrente', [TransactionController::class, 'unlinkRecurring'])->name('transactions.unlink-recurring');
         Route::post('transactions/{transaction}/receipts/extract', [ReceiptExtractController::class, 'storeAndPrefill'])->name('transactions.receipts.extract');
         Route::post('transactions/{transaction}/receipts', [TransactionReceiptController::class, 'store'])->name('transactions.receipts.store');
         Route::post('transactions/{transaction}/receipts/link', [TransactionReceiptController::class, 'link'])->name('transactions.receipts.link');
@@ -109,6 +114,12 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::get('companies/{company}/edit', [CompanyController::class, 'edit'])->name('companies.edit');
         Route::put('companies/{company}', [CompanyController::class, 'update'])->name('companies.update');
         Route::delete('companies/{company}', [CompanyController::class, 'destroy'])->name('companies.destroy');
+
+        Route::get('receitas-recorrentes', [RecurringIncomeController::class, 'index'])->name('recurring-income.index');
+        Route::post('receitas-recorrentes', [RecurringIncomeController::class, 'store'])->name('recurring-income.store');
+        Route::put('receitas-recorrentes/{recurringIncome}', [RecurringIncomeController::class, 'update'])->name('recurring-income.update');
+        Route::post('receitas-recorrentes/{recurringIncome}/recebida', [RecurringIncomeController::class, 'markReceived'])->name('recurring-income.mark-received');
+        Route::delete('receitas-recorrentes/{recurringIncome}', [RecurringIncomeController::class, 'destroy'])->name('recurring-income.destroy');
 
         Route::get('clt-salaries', [CltSalaryController::class, 'index'])->name('clt-salaries.index');
         Route::post('clt-salaries', [CltSalaryController::class, 'store'])->name('clt-salaries.store');
@@ -153,8 +164,9 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
         Route::post('documents/{document}/extract', [ReceiptExtractController::class, 'previewDocument'])->name('documents.extract');
 
-        Route::get('alerts', [AlertController::class, 'index'])->name('alerts.index');
+        Route::get('alerts', [AlertController::class, 'index'])->name('alerts.index')->middleware('persist-filters');
         Route::patch('alerts/{alert}/read', [AlertController::class, 'markRead'])->name('alerts.read');
+        Route::post('alerts/bulk-read', [AlertController::class, 'bulkMarkRead'])->name('alerts.bulk-read');
 
         Route::get('observability', [ObservabilityController::class, 'index'])->name('observability.index');
 

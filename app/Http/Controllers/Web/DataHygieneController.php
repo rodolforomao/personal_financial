@@ -79,7 +79,7 @@ class DataHygieneController extends Controller
         } elseif (! empty($validated['operation_id'])) {
             $changes['operation_id'] = (int) $validated['operation_id'];
         } else {
-            return back()->with('warning', 'Selecione uma operação ou apartamento.');
+            return back()->with('warning', 'Selecione uma operação ou unidade.');
         }
 
         $result = $bulk->apply($workspaceId, $validated['ids'], $changes, $request->user());

@@ -1,10 +1,16 @@
 <div class="card mb-3">
-    <div class="card-header py-2 d-flex justify-content-between align-items-center">
-        <h3 class="card-title mb-0 small"><i class="bi bi-funnel"></i> Filtros do relatório</h3>
+    <div class="card-header py-2 d-flex justify-content-between align-items-center filter-card-header @if(!($filtersActive ?? false)) collapsed @endif"
+         data-bs-toggle="collapse" data-bs-target="#report-filter-collapse"
+         aria-expanded="{{ ($filtersActive ?? false) ? 'true' : 'false' }}" aria-controls="report-filter-collapse">
+        <h3 class="card-title mb-0 small">
+            <i class="bi bi-funnel"></i> Filtros do relatório
+            <i class="bi bi-chevron-down ms-1 filter-chevron" style="font-size:.75rem"></i>
+        </h3>
         @if($filtersActive ?? false)
             <span class="badge text-bg-primary">Filtros ativos</span>
         @endif
     </div>
+    <div class="collapse @if($filtersActive ?? false) show @endif" id="report-filter-collapse">
     <div class="card-body py-2">
         <form method="GET" action="{{ route('reports.index') }}" id="report-filter-form">
             <input type="hidden" name="view" value="{{ $view ?? 'resumo' }}">
@@ -45,7 +51,7 @@
                     </select>
                 </div>
                 <div class="col-md-4 col-lg-3">
-                    <label class="form-label small mb-0">Unidade (apto)</label>
+                    <label class="form-label small mb-0">Unidade</label>
                     <select name="operation_unit_id" id="report-filter-operation-unit-id" class="form-select form-select-sm"
                             @disabled(!request('operation_id'))>
                         <option value="">Todas</option>
@@ -94,7 +100,7 @@
                 </div>
                 <div class="col-md-4 col-lg-3 d-flex gap-1 align-items-end flex-wrap">
                     <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Aplicar</button>
-                    <a href="{{ route('reports.index') }}" class="btn btn-sm btn-outline-secondary">Limpar</a>
+                    <a href="{{ route('reports.index', ['clear' => 1]) }}" class="btn btn-sm btn-outline-secondary">Limpar</a>
                 </div>
             </div>
             <p class="text-muted small mb-0 mt-2">
@@ -102,5 +108,6 @@
                 Os botões <strong>Baixar XLSX/PDF</strong> usam os filtros aplicados na página (aplique antes de exportar).
             </p>
         </form>
+    </div>
     </div>
 </div>

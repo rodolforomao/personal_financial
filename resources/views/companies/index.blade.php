@@ -49,7 +49,7 @@
                         <td>{{ $c->partnership_share ? $c->partnership_share.'%' : '—' }}</td>
                         <td>R$ {{ number_format($c->expected_monthly_revenue ?? 0, 2, ',', '.') }}</td>
                         <td class="text-end text-nowrap">
-                            <a href="{{ route('operations.create', ['company_id' => $c->id]) }}" class="btn btn-sm btn-outline-secondary" title="Operação separada (apartamentos, etc.)">
+                            <a href="{{ route('operations.create', ['company_id' => $c->id]) }}" class="btn btn-sm btn-outline-secondary" title="Criar operação vinculada (com unidades)">
                                 <i class="bi bi-diagram-3"></i>
                             </a>
                             <a href="{{ route('companies.edit', $c) }}" class="btn btn-sm btn-outline-primary" title="Editar">

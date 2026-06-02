@@ -18,7 +18,7 @@
     <small class="text-muted">Negócios separados (ex. Residencial Oliveiras) não entram no dashboard geral.</small>
 </div>
 <div class="col-md-6 mb-3">
-    <label class="form-label">Apartamento / unidade</label>
+    <label class="form-label">Unidade</label>
     <select name="operation_unit_id" id="tx-operation-unit-id" class="form-select">
         <option value="">— Operação inteira ou geral —</option>
     </select>

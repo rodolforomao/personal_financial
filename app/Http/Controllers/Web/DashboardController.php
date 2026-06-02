@@ -15,9 +15,7 @@ use Modules\Finance\Application\Services\DashboardFilterService;
 use Modules\Finance\Application\Services\ForecastService;
 use Modules\Finance\Infrastructure\Models\Asset;
 use Modules\Finance\Infrastructure\Models\Transaction;
-use Modules\Intelligence\Infrastructure\Models\AiInsight;
 use Modules\Operations\Infrastructure\Models\Operation;
-use Modules\Projects\Infrastructure\Models\Project;
 
 class DashboardController extends Controller
 {
@@ -56,17 +54,10 @@ class DashboardController extends Controller
                 ->latest('transaction_date')
                 ->limit(8)
                 ->get(),
-            'projects' => Project::query()->where('workspace_id', $workspaceId)->limit(5)->get(),
             'openAlerts' => Alert::query()
                 ->where('workspace_id', $workspaceId)
                 ->where('is_read', false)
                 ->orderByDesc('triggered_at')
-                ->limit(5)
-                ->get(),
-            'insights' => AiInsight::query()
-                ->where('workspace_id', $workspaceId)
-                ->where('is_resolved', false)
-                ->orderByDesc('detected_at')
                 ->limit(5)
                 ->get(),
         ]);

@@ -3,6 +3,7 @@
 namespace Modules\Categorization\Application\Services;
 
 use Modules\Finance\Infrastructure\Models\Transaction;
+use Modules\Operations\Infrastructure\Models\Operation;
 
 class BulkCategorizeTransactionsService
 {
@@ -11,11 +12,14 @@ class BulkCategorizeTransactionsService
     ) {}
 
     /**
-     * @return array{categorized: int, unchanged: int, total: int}
+     * @return array{categorized: int, unchanged: int, total: int, operations_assigned: int}
      */
     public function run(int $workspaceId): array
     {
-        return $this->categorize($workspaceId);
+        return array_merge(
+            $this->categorize($workspaceId),
+            ['operations_assigned' => $this->assignOperationsFromCompany($workspaceId)],
+        );
     }
 
     /**
@@ -88,6 +92,36 @@ class BulkCategorizeTransactionsService
             'unchanged' => $unchanged,
             'total' => $total,
         ];
+    }
+
+    protected function assignOperationsFromCompany(int $workspaceId): int
+    {
+        $operations = Operation::query()
+            ->where('workspace_id', $workspaceId)
+            ->whereNotNull('company_id')
+            ->get()
+            ->keyBy('company_id');
+
+        if ($operations->isEmpty()) {
+            return 0;
+        }
+
+        $assigned = 0;
+
+        Transaction::query()
+            ->where('workspace_id', $workspaceId)
+            ->whereNull('operation_id')
+            ->whereNotNull('company_id')
+            ->whereIn('company_id', $operations->keys())
+            ->each(function (Transaction $transaction) use ($operations, &$assigned) {
+                $operation = $operations->get($transaction->company_id);
+                if ($operation) {
+                    $transaction->update(['operation_id' => $operation->id]);
+                    $assigned++;
+                }
+            });
+
+        return $assigned;
     }
 
     public function countUncategorized(int $workspaceId): int

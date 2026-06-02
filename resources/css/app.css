@@ -1,4 +1,16 @@
 /* Custom overrides on top of AdminLTE 4 + Bootstrap 5 */
+
+/* Collapsible filter panels */
+.filter-card-header {
+    cursor: pointer;
+    user-select: none;
+}
+.filter-card-header .filter-chevron {
+    transition: transform .2s ease;
+}
+.filter-card-header.collapsed .filter-chevron {
+    transform: rotate(-90deg);
+}
 .app-wrapper {
     min-height: 100vh;
 }
