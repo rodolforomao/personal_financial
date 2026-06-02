@@ -95,6 +95,45 @@ class CategorizationService
         return null;
     }
 
+    /**
+     * Busca operação e/ou empresa apenas pelas regras próprias do workspace
+     * que tenham operation_id ou company_id definidos.
+     * Não considera regras compartilhadas (CategorizationRuleAssignment).
+     *
+     * @return array{operation_id: int|null, company_id: int|null}|null
+     */
+    public function suggestOperationFromRules(
+        int $workspaceId,
+        string $description,
+        ?string $counterparty = null,
+        ?TransactionType $transactionType = null,
+    ): ?array {
+        $haystack = $this->normalizeText(trim("{$description} {$counterparty}"));
+
+        $rules = CategorizationRule::query()
+            ->where('workspace_id', $workspaceId)
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereNotNull('operation_id')->orWhereNotNull('company_id');
+            })
+            ->orderBy('priority')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($rules as $rule) {
+            if (! $this->matchesRule($rule, $haystack, $transactionType)) {
+                continue;
+            }
+
+            return [
+                'operation_id' => $rule->operation_id ?: null,
+                'company_id'   => $rule->company_id ?: null,
+            ];
+        }
+
+        return null;
+    }
+
     public function ruleMatchesTransaction(
         CategorizationRule $rule,
         string $description,

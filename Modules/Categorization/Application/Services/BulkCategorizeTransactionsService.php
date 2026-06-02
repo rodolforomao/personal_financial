@@ -104,12 +104,13 @@ class BulkCategorizeTransactionsService
     }
 
     /**
-     * Vincula operações a transações sem operation_id usando três passagens:
+     * Vincula operações a transações sem operation_id usando quatro passagens:
      * 1. FK direta: operation.company_id = transaction.company_id
      * 2. Nome da empresa → nome da operação (fallback quando FK não está setada)
      * 3. Descrição/contraparte → nome da operação ou da empresa vinculada
+     * 4. Regras de categorização com operation_id/company_id definidos
      *
-     * @return array{assigned: int, via_company: int, via_description: int}
+     * @return array{assigned: int, via_company: int, via_description: int, via_rules: int}
      */
     public function runOperationAssignment(int $workspaceId): array
     {
@@ -172,14 +173,15 @@ class BulkCategorizeTransactionsService
 
         $viaCompany     = 0;
         $viaDescription = 0;
+        $viaRules       = 0;
 
         Transaction::query()
             ->where('workspace_id', $workspaceId)
             ->whereNull('operation_id')
             ->each(function (Transaction $transaction) use (
-                $companyMap, $needleMap, &$viaCompany, &$viaDescription
+                $workspaceId, $companyMap, $needleMap, &$viaCompany, &$viaDescription, &$viaRules
             ) {
-                // Passagens 1 e 2: empresa
+                // Passagens 1 e 2: empresa (FK ou nome)
                 if ($transaction->company_id && $companyMap->has($transaction->company_id)) {
                     $op = $companyMap->get($transaction->company_id);
                     $transaction->update(['operation_id' => $op->id]);
@@ -187,14 +189,13 @@ class BulkCategorizeTransactionsService
                     return;
                 }
 
-                // Passagem 3: descrição / contraparte
+                // Passagem 3: descrição / contraparte → nome operação ou empresa
                 $haystack = Str::lower(Str::ascii(
                     trim($transaction->description . ' ' . ($transaction->counterparty ?? ''))
                 ));
                 foreach ($needleMap as $needle => $op) {
                     if ($needle !== '' && str_contains($haystack, $needle)) {
                         $update = ['operation_id' => $op->id];
-                        // Se a operação tem empresa e a transação ainda não tem, aproveita
                         if ($op->company_id && ! $transaction->company_id) {
                             $update['company_id'] = $op->company_id;
                         }
@@ -203,12 +204,32 @@ class BulkCategorizeTransactionsService
                         return;
                     }
                 }
+
+                // Passagem 4: regras de categorização com operation_id/company_id
+                $ruleSuggestion = $this->categorization->suggestOperationFromRules(
+                    $workspaceId,
+                    $transaction->description,
+                    $transaction->counterparty,
+                    $transaction->type,
+                );
+                if ($ruleSuggestion && (! empty($ruleSuggestion['operation_id']) || ! empty($ruleSuggestion['company_id']))) {
+                    $update = [];
+                    if (! empty($ruleSuggestion['operation_id'])) {
+                        $update['operation_id'] = $ruleSuggestion['operation_id'];
+                    }
+                    if (! $transaction->company_id && ! empty($ruleSuggestion['company_id'])) {
+                        $update['company_id'] = $ruleSuggestion['company_id'];
+                    }
+                    $transaction->update($update);
+                    $viaRules++;
+                }
             });
 
         return [
-            'assigned'        => $viaCompany + $viaDescription,
+            'assigned'        => $viaCompany + $viaDescription + $viaRules,
             'via_company'     => $viaCompany,
             'via_description' => $viaDescription,
+            'via_rules'       => $viaRules,
         ];
     }
 

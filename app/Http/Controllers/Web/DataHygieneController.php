@@ -119,11 +119,18 @@ class DataHygieneController extends Controller
         }
 
         $msg = "{$result['assigned']} transação(ões) vinculada(s) à operação automaticamente.";
-        if ($result['via_company'] > 0) {
-            $msg .= " {$result['via_company']} via empresa.";
+        $parts = [];
+        if (! empty($result['via_company'])) {
+            $parts[] = "{$result['via_company']} via empresa";
         }
-        if ($result['via_description'] > 0) {
-            $msg .= " {$result['via_description']} via descrição.";
+        if (! empty($result['via_description'])) {
+            $parts[] = "{$result['via_description']} via descrição";
+        }
+        if (! empty($result['via_rules'])) {
+            $parts[] = "{$result['via_rules']} via regras de categorização";
+        }
+        if ($parts) {
+            $msg .= ' (' . implode(', ', $parts) . ').';
         }
 
         return redirect()
