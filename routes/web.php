@@ -75,6 +75,7 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::get('data-hygiene', [DataHygieneController::class, 'index'])->name('data-hygiene.index');
         Route::post('data-hygiene/fix', [DataHygieneController::class, 'applyFix'])->name('data-hygiene.fix');
         Route::post('data-hygiene/bulk-assign', [DataHygieneController::class, 'bulkAssign'])->name('data-hygiene.bulk-assign');
+        Route::post('data-hygiene/auto-assign-operations', [DataHygieneController::class, 'autoAssignOperations'])->name('data-hygiene.auto-assign-operations');
 
         Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
         Route::post('categories', [CategoryController::class, 'store'])->name('categories.store');

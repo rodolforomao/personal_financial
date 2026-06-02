@@ -96,6 +96,115 @@ class BulkCategorizeTransactionsService
         ];
     }
 
+    /**
+     * Vincula operações a transações sem operation_id usando três passagens:
+     * 1. FK direta: operation.company_id = transaction.company_id
+     * 2. Nome da empresa → nome da operação (fallback quando FK não está setada)
+     * 3. Descrição/contraparte → nome da operação ou da empresa vinculada
+     *
+     * @return array{assigned: int, via_company: int, via_description: int}
+     */
+    public function runOperationAssignment(int $workspaceId): array
+    {
+        $allOps = Operation::query()
+            ->where('workspace_id', $workspaceId)
+            ->with('company')
+            ->get();
+
+        if ($allOps->isEmpty()) {
+            return ['assigned' => 0, 'via_company' => 0, 'via_description' => 0];
+        }
+
+        // Mapa company_id → Operation (passagem 1: FK direta)
+        $byCompanyId = $allOps
+            ->whereNotNull('company_id')
+            ->keyBy('company_id');
+
+        // Mapa company_id → Operation (passagem 2: nome empresa ↔ nome operação)
+        $unmatchedCompanyIds = Transaction::query()
+            ->where('workspace_id', $workspaceId)
+            ->whereNull('operation_id')
+            ->whereNotNull('company_id')
+            ->whereNotIn('company_id', $byCompanyId->keys())
+            ->pluck('company_id')
+            ->unique();
+
+        $byCompanyName = collect();
+        if ($unmatchedCompanyIds->isNotEmpty()) {
+            $companies = Company::query()->whereIn('id', $unmatchedCompanyIds)->get();
+            foreach ($companies as $company) {
+                $needle = Str::lower(Str::ascii($company->name));
+                $match = $allOps->first(fn (Operation $op) =>
+                    Str::lower(Str::ascii($op->name)) === $needle ||
+                    str_contains(Str::lower(Str::ascii($op->name)), $needle)
+                );
+                if ($match) {
+                    $byCompanyName->put($company->id, $match);
+                }
+            }
+        }
+
+        $companyMap = $byCompanyId->union($byCompanyName);
+
+        // Passagem 3: mapa de needles (nome operação + nome empresa) → Operation
+        $needleMap = []; // string => Operation
+        foreach ($allOps as $op) {
+            $key = Str::lower(Str::ascii($op->name));
+            if ($key !== '') {
+                $needleMap[$key] = $op;
+            }
+            if ($op->company) {
+                $companyKey = Str::lower(Str::ascii($op->company->name));
+                if ($companyKey !== '' && ! isset($needleMap[$companyKey])) {
+                    $needleMap[$companyKey] = $op;
+                }
+            }
+        }
+        // Ordena do mais longo para o mais curto para evitar matches parciais errados
+        uksort($needleMap, fn ($a, $b) => strlen($b) - strlen($a));
+
+        $viaCompany     = 0;
+        $viaDescription = 0;
+
+        Transaction::query()
+            ->where('workspace_id', $workspaceId)
+            ->whereNull('operation_id')
+            ->each(function (Transaction $transaction) use (
+                $companyMap, $needleMap, &$viaCompany, &$viaDescription
+            ) {
+                // Passagens 1 e 2: empresa
+                if ($transaction->company_id && $companyMap->has($transaction->company_id)) {
+                    $op = $companyMap->get($transaction->company_id);
+                    $transaction->update(['operation_id' => $op->id]);
+                    $viaCompany++;
+                    return;
+                }
+
+                // Passagem 3: descrição / contraparte
+                $haystack = Str::lower(Str::ascii(
+                    trim($transaction->description . ' ' . ($transaction->counterparty ?? ''))
+                ));
+                foreach ($needleMap as $needle => $op) {
+                    if ($needle !== '' && str_contains($haystack, $needle)) {
+                        $update = ['operation_id' => $op->id];
+                        // Se a operação tem empresa e a transação ainda não tem, aproveita
+                        if ($op->company_id && ! $transaction->company_id) {
+                            $update['company_id'] = $op->company_id;
+                        }
+                        $transaction->update($update);
+                        $viaDescription++;
+                        return;
+                    }
+                }
+            });
+
+        return [
+            'assigned'        => $viaCompany + $viaDescription,
+            'via_company'     => $viaCompany,
+            'via_description' => $viaDescription,
+        ];
+    }
+
     protected function assignOperationsFromCompany(int $workspaceId): int
     {
         // Passagem 1: operações que já têm company_id definido (link direto por FK)

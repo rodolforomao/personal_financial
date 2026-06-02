@@ -158,11 +158,11 @@
 <div class="alert alert-light border mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
     <span>Lançamentos sem operação entram no <strong>dashboard consolidado</strong> (salário, gastos pessoais, lucros repassados).
     <a href="{{ route('transactions.index') }}?{{ http_build_query(['missing' => 'operation']) }}">Ver na lista de transações</a></span>
-    <form action="{{ route('transactions.bulk-categorize') }}" method="POST" class="mb-0"
-          onsubmit="return confirm('Executar auto-categorização e vincular operações via empresa?');">
+    <form action="{{ route('data-hygiene.auto-assign-operations') }}" method="POST" class="mb-0"
+          onsubmit="return confirm('Vincular operações automaticamente via empresa e descrição?');">
         @csrf
         <button type="submit" class="btn btn-warning btn-sm">
-            <i class="bi bi-magic"></i> Auto-categorizar
+            <i class="bi bi-magic"></i> Vincular operações automaticamente
         </button>
     </form>
 </div>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Modules\Categorization\Application\Services\BulkCategorizeTransactionsService;
 use Modules\Categorization\Infrastructure\Models\Category;
 use Modules\Companies\Infrastructure\Models\Company;
 use Modules\Finance\Application\Services\DataHygieneService;
@@ -104,6 +105,30 @@ class DataHygieneController extends Controller
         return redirect()
             ->route('data-hygiene.index', ['tab' => $tab])
             ->with('success', "{$result['updated']} lançamento(s) atualizado(s).");
+    }
+
+    public function autoAssignOperations(Request $request, BulkCategorizeTransactionsService $service): RedirectResponse
+    {
+        $workspaceId = (int) $request->attributes->get('workspace_id');
+        $result = $service->runOperationAssignment($workspaceId);
+
+        if ($result['assigned'] === 0) {
+            return redirect()
+                ->route('data-hygiene.index', ['tab' => 'without_operation'])
+                ->with('warning', 'Nenhuma transação teve operação vinculada automaticamente. Verifique se as operações estão cadastradas e com empresa associada.');
+        }
+
+        $msg = "{$result['assigned']} transação(ões) vinculada(s) à operação automaticamente.";
+        if ($result['via_company'] > 0) {
+            $msg .= " {$result['via_company']} via empresa.";
+        }
+        if ($result['via_description'] > 0) {
+            $msg .= " {$result['via_description']} via descrição.";
+        }
+
+        return redirect()
+            ->route('data-hygiene.index', ['tab' => 'without_operation'])
+            ->with('success', $msg);
     }
 
     protected function messageCompanyTypes(int $fixed): string
