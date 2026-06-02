@@ -18,6 +18,17 @@ return [
             'route' => 'reports.index',
             'icon' => 'bi bi-bar-chart-line',
         ],
+        ['header' => 'RECEITAS'],
+        [
+            'text' => 'Recorrentes',
+            'route' => 'recurring-income.index',
+            'icon' => 'bi bi-arrow-repeat',
+        ],
+        [
+            'text' => 'Unitárias',
+            'route' => 'income.index',
+            'icon' => 'bi bi-cash-stack',
+        ],
         ['header' => 'FINANÇAS'],
         [
             'text' => 'Transações',

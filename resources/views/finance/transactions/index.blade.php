@@ -253,9 +253,6 @@
                         <td>{{ $tx->transaction_date->format('d/m/Y') }}</td>
                         <td>
                             {{ $tx->description }}
-                            @if($tx->is_recurring)
-                                <i class="bi bi-arrow-repeat text-primary ms-1" title="Receita recorrente mensal"></i>
-                            @endif
                             @if(($tx->documents_count ?? 0) > 0)
                                 <span class="badge text-bg-info ms-1"><i class="bi bi-paperclip"></i> {{ $tx->documents_count }}</span>
                             @endif
@@ -297,7 +294,12 @@
                             @endif
                         </td>
                         <td><span class="badge text-bg-{{ $tx->type->value === 'income' ? 'success' : 'danger' }}">{{ $tx->type->value }}</span></td>
-                        <td class="text-end fw-semibold">R$ {{ number_format($tx->amount, 2, ',', '.') }}</td>
+                        <td class="text-end fw-semibold">
+                            @if($tx->is_recurring)
+                                <i class="bi bi-arrow-repeat text-primary me-1" title="{{ $tx->recurrenceColumnLabel() ?? 'Recorrente' }}"></i>
+                            @endif
+                            R$ {{ number_format($tx->amount, 2, ',', '.') }}
+                        </td>
                         <td class="text-end">
                             <a href="{{ route('transactions.edit', $tx) }}" class="btn btn-sm btn-outline-primary" title="Editar">
                                 <i class="bi bi-pencil"></i>

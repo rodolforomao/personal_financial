@@ -17,6 +17,7 @@ use App\Http\Controllers\Web\IntegrationSettingsController;
 use App\Http\Controllers\Web\ObservabilityController;
 use App\Http\Controllers\Web\OperationController;
 use App\Http\Controllers\Web\PlatformSettingsController;
+use App\Http\Controllers\Web\IncomeController;
 use App\Http\Controllers\Web\RecurringIncomeController;
 use App\Http\Controllers\Web\PlatformUserController;
 use App\Http\Controllers\Web\ProjectController;
@@ -115,6 +116,7 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::put('companies/{company}', [CompanyController::class, 'update'])->name('companies.update');
         Route::delete('companies/{company}', [CompanyController::class, 'destroy'])->name('companies.destroy');
 
+        Route::get('receitas/unitarias', [IncomeController::class, 'index'])->name('income.index')->middleware('persist-filters');
         Route::get('receitas-recorrentes', [RecurringIncomeController::class, 'index'])->name('recurring-income.index');
         Route::post('receitas-recorrentes', [RecurringIncomeController::class, 'store'])->name('recurring-income.store');
         Route::put('receitas-recorrentes/{recurringIncome}', [RecurringIncomeController::class, 'update'])->name('recurring-income.update');

@@ -67,6 +67,7 @@ class PersistFilters
             'alerts.index'       => ['severity', 'status'],
             'transactions.index' => TransactionIndexFilterService::QUERY_KEYS,
             'reports.index'      => [...TransactionIndexFilterService::QUERY_KEYS, 'view'],
+            'income.index'       => ['description', 'date_from', 'date_to', 'category_id', 'company_id', 'operation_id'],
             default              => [],
         };
     }
