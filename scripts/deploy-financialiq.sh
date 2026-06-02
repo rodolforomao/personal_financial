@@ -324,7 +324,22 @@ set -euo pipefail
 cd "$REMOTE_DIR"
 sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan migrate --force
 sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan db:seed --class=Database\\Seeders\\FinancialPlatformSeeder --force
-sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan db:seed --class=Database\\Seeders\\NavigationMenuSeeder --force
+
+DB_NAME="$(grep '^DB_DATABASE=' "$REMOTE_DIR/.env" | cut -d= -f2 | tr -d '\"')"
+
+# Rotas esperadas segundo o seeder
+EXPECTED=$(grep -oP "(?<='route'\s*=>\s*')[^']+" "$REMOTE_DIR/database/seeders/NavigationMenuSeeder.php" | sort)
+# Rotas que já existem no banco
+ACTUAL=$(mysql -N "$DB_NAME" -e \
+  "SELECT route FROM navigation_menu_items WHERE type='link' AND route IS NOT NULL ORDER BY route;" \
+  2>/dev/null || echo "")
+
+if [[ "$EXPECTED" != "$ACTUAL" ]]; then
+  echo "    NavigationMenuSeeder: menu desatualizado, sincronizando..."
+  sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan db:seed --class=Database\\Seeders\\NavigationMenuSeeder --force
+else
+  echo "    NavigationMenuSeeder: menu ja sincronizado, ignorando."
+fi
 "$DEPLOY_PHP_BIN" artisan platform:ensure-health --fix --probe || true
 chown -R "$DEPLOY_WEB_USER:$DEPLOY_WEB_USER" storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
