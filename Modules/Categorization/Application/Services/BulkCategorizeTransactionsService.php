@@ -81,10 +81,17 @@ class BulkCategorizeTransactionsService
                 return;
             }
 
-            $transaction->update([
-                'category_id' => $suggestion['category_id'],
+            $update = [
+                'category_id'               => $suggestion['category_id'],
                 'categorization_confidence' => $suggestion['confidence'],
-            ]);
+            ];
+            if (! $transaction->operation_id && ! empty($suggestion['operation_id'])) {
+                $update['operation_id'] = $suggestion['operation_id'];
+            }
+            if (! $transaction->company_id && ! empty($suggestion['company_id'])) {
+                $update['company_id'] = $suggestion['company_id'];
+            }
+            $transaction->update($update);
 
             $categorized++;
         });

@@ -77,11 +77,19 @@ class CategorizationService
                 $rule->increment('hit_count');
             }
 
-            return $this->normalize($workspaceId, [
+            $payload = [
                 'category_id' => $candidate['category_id'],
-                'confidence' => 95.0,
-                'source' => $candidate['assignment'] ? 'shared_rule' : 'rule',
-            ]);
+                'confidence'  => 95.0,
+                'source'      => $candidate['assignment'] ? 'shared_rule' : 'rule',
+            ];
+
+            // operation_id e company_id só para regras próprias (não compartilhadas)
+            if (! $candidate['assignment']) {
+                $payload['operation_id'] = $rule->operation_id ?: null;
+                $payload['company_id']   = $rule->company_id ?: null;
+            }
+
+            return $this->normalize($workspaceId, $payload);
         }
 
         return null;

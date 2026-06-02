@@ -57,6 +57,12 @@ class CreateTransactionAction
             if ($suggestion) {
                 $attributes['category_id'] = $suggestion['category_id'];
                 $attributes['categorization_confidence'] = $suggestion['confidence'];
+                if (empty($attributes['operation_id']) && ! empty($suggestion['operation_id'])) {
+                    $attributes['operation_id'] = $suggestion['operation_id'];
+                }
+                if (empty($attributes['company_id']) && ! empty($suggestion['company_id'])) {
+                    $attributes['company_id'] = $suggestion['company_id'];
+                }
             }
         }
 

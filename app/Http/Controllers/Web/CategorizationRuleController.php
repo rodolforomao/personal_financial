@@ -12,6 +12,8 @@ use Modules\Categorization\Application\Services\SharedCategorizationRuleSuggesti
 use Modules\Categorization\Infrastructure\Models\Category;
 use Modules\Categorization\Infrastructure\Models\CategorizationRule;
 use Modules\Categorization\Infrastructure\Models\CategorizationRuleAssignment;
+use Modules\Companies\Infrastructure\Models\Company;
+use Modules\Operations\Infrastructure\Models\Operation;
 
 class CategorizationRuleController extends Controller
 {
@@ -21,7 +23,7 @@ class CategorizationRuleController extends Controller
 
         $rules = CategorizationRule::query()
             ->where('workspace_id', $workspaceId)
-            ->with('category')
+            ->with(['category', 'operation', 'company'])
             ->orderBy('priority')
             ->orderBy('name')
             ->orderBy('pattern')
@@ -50,6 +52,8 @@ class CategorizationRuleController extends Controller
                 ->get(),
             'sharedSuggestions' => $sharedSuggestions->forWorkspace($workspaceId),
             'categories' => $categories,
+            'operations' => Operation::query()->where('workspace_id', $workspaceId)->orderBy('name')->get(),
+            'companies'  => Company::query()->where('workspace_id', $workspaceId)->orderBy('name')->get(),
             'matchTypes' => $this->matchTypes(),
             'suggestedNames' => $suggestedNames,
         ]);
@@ -80,12 +84,14 @@ class CategorizationRuleController extends Controller
                     'pattern' => $pattern,
                 ],
                 [
-                    'category_id' => $validated['category_id'],
-                    'name' => $name,
-                    'match_type' => $validated['match_type'],
+                    'category_id'      => $validated['category_id'],
+                    'operation_id'     => $validated['operation_id'] ?? null,
+                    'company_id'       => $validated['company_id'] ?? null,
+                    'name'             => $name,
+                    'match_type'       => $validated['match_type'],
                     'transaction_type' => $validated['transaction_type'] ?? null,
-                    'priority' => $validated['priority'],
-                    'is_active' => $request->boolean('is_active', true),
+                    'priority'         => $validated['priority'],
+                    'is_active'        => $request->boolean('is_active', true),
                 ],
             );
 
@@ -238,12 +244,14 @@ class CategorizationRuleController extends Controller
     protected function validateBulkCreate(Request $request): array
     {
         $validated = $request->validate([
-            'names' => 'required|array|min:1',
-            'names.*' => 'required|string|max:120',
-            'match_type' => 'required|in:contains,starts_with,equals,regex',
-            'category_id' => 'required|exists:categories,id',
+            'names'            => 'required|array|min:1',
+            'names.*'          => 'required|string|max:120',
+            'match_type'       => 'required|in:contains,starts_with,equals,regex',
+            'category_id'      => 'required|exists:categories,id',
+            'operation_id'     => 'nullable|exists:operations,id',
+            'company_id'       => 'nullable|exists:companies,id',
             'transaction_type' => 'nullable|in:income,expense',
-            'priority' => 'required|integer|min:1|max:9999',
+            'priority'         => 'required|integer|min:1|max:9999',
         ]);
 
         $validated['names'] = collect($validated['names'])
@@ -268,12 +276,14 @@ class CategorizationRuleController extends Controller
     protected function validateRule(Request $request): array
     {
         return $request->validate([
-            'name' => 'required|string|max:120',
-            'pattern' => 'required|string|max:255',
-            'match_type' => 'required|in:contains,starts_with,equals,regex',
-            'category_id' => 'required|exists:categories,id',
+            'name'             => 'required|string|max:120',
+            'pattern'          => 'required|string|max:255',
+            'match_type'       => 'required|in:contains,starts_with,equals,regex',
+            'category_id'      => 'required|exists:categories,id',
+            'operation_id'     => 'nullable|exists:operations,id',
+            'company_id'       => 'nullable|exists:companies,id',
             'transaction_type' => 'nullable|in:income,expense',
-            'priority' => 'required|integer|min:1|max:9999',
+            'priority'         => 'required|integer|min:1|max:9999',
         ]);
     }
 

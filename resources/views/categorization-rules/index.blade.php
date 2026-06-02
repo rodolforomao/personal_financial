@@ -55,6 +55,24 @@
                         </select>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">Operação <span class="badge text-bg-secondary ms-1" style="font-size:.7rem">só deste workspace</span></label>
+                        <select name="operation_id" class="form-select">
+                            <option value="">— Nenhuma —</option>
+                            @foreach($operations as $op)
+                                <option value="{{ $op->id }}" @selected((int) old('operation_id') === $op->id)>{{ $op->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Empresa <span class="badge text-bg-secondary ms-1" style="font-size:.7rem">só deste workspace</span></label>
+                        <select name="company_id" class="form-select">
+                            <option value="">— Nenhuma —</option>
+                            @foreach($companies as $co)
+                                <option value="{{ $co->id }}" @selected((int) old('company_id') === $co->id)>{{ $co->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Aplicar só a transações</label>
                         <select name="transaction_type" class="form-select">
                             <option value="" @selected(old('transaction_type') === null || old('transaction_type') === '')>Qualquer tipo</option>
@@ -206,6 +224,8 @@
                             <th>Nome</th>
                             <th>Padrão</th>
                             <th>Categoria</th>
+                            <th>Operação</th>
+                            <th>Empresa</th>
                             <th>Tipo tx.</th>
                             <th class="text-center">Prior.</th>
                             <th class="text-center">Usos</th>
@@ -230,6 +250,8 @@
                                         —
                                     @endif
                                 </td>
+                                <td class="small">{{ $rule->operation?->name ?? '—' }}</td>
+                                <td class="small">{{ $rule->company?->name ?? '—' }}</td>
                                 <td>
                                     @if($rule->transaction_type === 'income')
                                         <span class="badge text-bg-success">Receita</span>
@@ -262,20 +284,20 @@
                                 </td>
                             </tr>
                             <tr class="collapse" id="edit-rule-{{ $rule->id }}">
-                                <td colspan="8" class="bg-light">
+                                <td colspan="10" class="bg-light">
                                     <form action="{{ route('categorization-rules.update', $rule) }}" method="POST" class="p-3">
                                         @csrf
                                         @method('PUT')
                                         <div class="row g-2">
-                                            <div class="col-md-3">
+                                            <div class="col-md-2">
                                                 <label class="form-label small">Nome</label>
                                                 <input type="text" name="name" class="form-control form-control-sm" value="{{ $rule->name }}" required>
                                             </div>
-                                            <div class="col-md-3">
+                                            <div class="col-md-2">
                                                 <label class="form-label small">Padrão</label>
                                                 <input type="text" name="pattern" class="form-control form-control-sm" value="{{ $rule->pattern }}" required>
                                             </div>
-                                            <div class="col-md-2">
+                                            <div class="col-md-1">
                                                 <label class="form-label small">Correspondência</label>
                                                 <select name="match_type" class="form-select form-select-sm">
                                                     @foreach($matchTypes as $value => $label)
@@ -288,6 +310,24 @@
                                                 <select name="category_id" class="form-select form-select-sm" required>
                                                     @foreach($categories as $cat)
                                                         <option value="{{ $cat->id }}" @selected($rule->category_id === $cat->id)>{{ $cat->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label small">Operação <span class="text-muted">(só aqui)</span></label>
+                                                <select name="operation_id" class="form-select form-select-sm">
+                                                    <option value="">— Nenhuma —</option>
+                                                    @foreach($operations as $op)
+                                                        <option value="{{ $op->id }}" @selected($rule->operation_id === $op->id)>{{ $op->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label small">Empresa <span class="text-muted">(só aqui)</span></label>
+                                                <select name="company_id" class="form-select form-select-sm">
+                                                    <option value="">— Nenhuma —</option>
+                                                    @foreach($companies as $co)
+                                                        <option value="{{ $co->id }}" @selected($rule->company_id === $co->id)>{{ $co->name }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
