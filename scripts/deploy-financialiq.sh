@@ -327,8 +327,9 @@ sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan db:seed --class=Database\\S
 
 DB_NAME="$(grep '^DB_DATABASE=' "$REMOTE_DIR/.env" | cut -d= -f2 | tr -d '\"')"
 
-# Rotas esperadas segundo o seeder
-EXPECTED=$(grep -oP "(?<='route'\s*=>\s*')[^']+" "$REMOTE_DIR/database/seeders/NavigationMenuSeeder.php" | sort)
+# Rotas esperadas segundo o seeder (apenas strings literais, ex: 'dashboard', 'reports.index')
+EXPECTED=$(grep "'route'" "$REMOTE_DIR/database/seeders/NavigationMenuSeeder.php" | \
+  sed -n "s/.*'route'[[:space:]]*=>[[:space:]]*'\([a-z][a-z0-9._-]*\)'.*/\1/p" | sort)
 # Rotas que já existem no banco
 ACTUAL=$(mysql -N "$DB_NAME" -e \
   "SELECT route FROM navigation_menu_items WHERE type='link' AND route IS NOT NULL ORDER BY route;" \
