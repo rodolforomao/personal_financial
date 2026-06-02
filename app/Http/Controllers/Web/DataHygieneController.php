@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Modules\Categorization\Infrastructure\Models\Category;
+use Modules\Companies\Infrastructure\Models\Company;
 use Modules\Finance\Application\Services\DataHygieneService;
 use Modules\Finance\Application\Services\TransactionBulkActionService;
 use Modules\Operations\Infrastructure\Models\Operation;
@@ -17,14 +19,19 @@ class DataHygieneController extends Controller
         $workspaceId = (int) $request->attributes->get('workspace_id');
         $tab = $request->input('tab', 'overview');
 
+        $woFilters = $request->only(['description', 'company_id', 'type', 'category_id', 'date_from', 'date_to']);
+        $woFiltersActive = array_filter($woFilters) !== [];
+
         return view('finance.data-hygiene.index', [
             'tab' => $tab,
             'audit' => $hygiene->audit($workspaceId),
             'unitWarnings' => $hygiene->suspiciousOperationUnits($workspaceId),
-            'withoutOperation' => $hygiene->withoutOperationQuery($workspaceId)
+            'withoutOperation' => $hygiene->withoutOperationQuery($workspaceId, $woFilters)
                 ->latest('transaction_date')
                 ->paginate(15, ['*'], 'without_op_page')
                 ->withQueryString(),
+            'woFilters' => $woFilters,
+            'woFiltersActive' => $woFiltersActive,
             'missingUnit' => $hygiene->missingUnitQuery($workspaceId)
                 ->with(['category', 'operation', 'company'])
                 ->latest('transaction_date')
@@ -33,6 +40,14 @@ class DataHygieneController extends Controller
             'operations' => Operation::query()
                 ->where('workspace_id', $workspaceId)
                 ->with(['activeUnits', 'company'])
+                ->orderBy('name')
+                ->get(),
+            'companies' => Company::query()
+                ->where('workspace_id', $workspaceId)
+                ->orderBy('name')
+                ->get(),
+            'categories' => Category::query()
+                ->where('workspace_id', $workspaceId)
                 ->orderBy('name')
                 ->get(),
         ]);

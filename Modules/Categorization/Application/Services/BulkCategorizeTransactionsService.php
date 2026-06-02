@@ -2,6 +2,8 @@
 
 namespace Modules\Categorization\Application\Services;
 
+use Illuminate\Support\Str;
+use Modules\Companies\Infrastructure\Models\Company;
 use Modules\Finance\Infrastructure\Models\Transaction;
 use Modules\Operations\Infrastructure\Models\Operation;
 
@@ -96,13 +98,52 @@ class BulkCategorizeTransactionsService
 
     protected function assignOperationsFromCompany(int $workspaceId): int
     {
-        $operations = Operation::query()
+        // Passagem 1: operações que já têm company_id definido (link direto por FK)
+        $byCompanyId = Operation::query()
             ->where('workspace_id', $workspaceId)
             ->whereNotNull('company_id')
             ->get()
             ->keyBy('company_id');
 
-        if ($operations->isEmpty()) {
+        // Passagem 2: empresas cujas transações ainda não têm operação e não
+        // foram cobertas pela passagem 1 — tenta casar pelo nome da empresa
+        // com o nome da operação (ex.: "Pessoa Física" → operação "Pessoa Física" ou "Geral")
+        $unmatchedCompanyIds = Transaction::query()
+            ->where('workspace_id', $workspaceId)
+            ->whereNull('operation_id')
+            ->whereNotNull('company_id')
+            ->whereNotIn('company_id', $byCompanyId->keys())
+            ->pluck('company_id')
+            ->unique();
+
+        $byNameFallback = collect(); // company_id -> Operation
+
+        if ($unmatchedCompanyIds->isNotEmpty()) {
+            $companies = Company::query()
+                ->whereIn('id', $unmatchedCompanyIds)
+                ->get();
+
+            $allOps = Operation::query()
+                ->where('workspace_id', $workspaceId)
+                ->get();
+
+            foreach ($companies as $company) {
+                $needle = Str::lower(Str::ascii($company->name));
+
+                $match = $allOps->first(function (Operation $op) use ($needle) {
+                    $haystack = Str::lower(Str::ascii($op->name));
+                    return $haystack === $needle || str_contains($haystack, $needle);
+                });
+
+                if ($match) {
+                    $byNameFallback->put($company->id, $match);
+                }
+            }
+        }
+
+        $map = $byCompanyId->union($byNameFallback);
+
+        if ($map->isEmpty()) {
             return 0;
         }
 
@@ -112,9 +153,9 @@ class BulkCategorizeTransactionsService
             ->where('workspace_id', $workspaceId)
             ->whereNull('operation_id')
             ->whereNotNull('company_id')
-            ->whereIn('company_id', $operations->keys())
-            ->each(function (Transaction $transaction) use ($operations, &$assigned) {
-                $operation = $operations->get($transaction->company_id);
+            ->whereIn('company_id', $map->keys())
+            ->each(function (Transaction $transaction) use ($map, &$assigned) {
+                $operation = $map->get($transaction->company_id);
                 if ($operation) {
                     $transaction->update(['operation_id' => $operation->id]);
                     $assigned++;

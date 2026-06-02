@@ -155,10 +155,78 @@
 @endif
 
 @if($tab === 'without_operation')
-<div class="alert alert-light border">
+<div class="alert alert-light border mb-3">
     Lançamentos sem operação entram no <strong>dashboard consolidado</strong> (salário, gastos pessoais, lucros repassados).
     <a href="{{ route('transactions.index') }}?{{ http_build_query(['missing' => 'operation']) }}">Ver na lista de transações</a>
 </div>
+
+<div class="card mb-3">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center filter-card-header @if(!($woFiltersActive ?? false)) collapsed @endif"
+         data-bs-toggle="collapse" data-bs-target="#wo-filter-collapse"
+         aria-expanded="{{ ($woFiltersActive ?? false) ? 'true' : 'false' }}" aria-controls="wo-filter-collapse">
+        <h3 class="card-title mb-0 small">
+            <i class="bi bi-funnel"></i> Filtros
+            <i class="bi bi-chevron-down ms-1 filter-chevron" style="font-size:.75rem"></i>
+        </h3>
+        @if($woFiltersActive ?? false)
+            <span class="badge text-bg-primary">Filtros ativos</span>
+        @endif
+    </div>
+    <div class="collapse @if($woFiltersActive ?? false) show @endif" id="wo-filter-collapse">
+        <div class="card-body py-2">
+            <form method="GET" action="{{ route('data-hygiene.index') }}" id="wo-filter-form">
+                <input type="hidden" name="tab" value="without_operation">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4 col-lg-3">
+                        <label class="form-label small mb-0">Descrição contém</label>
+                        <input type="text" name="description" class="form-control form-control-sm"
+                               value="{{ $woFilters['description'] ?? '' }}" placeholder="Ex.: pagamento, uber…">
+                    </div>
+                    <div class="col-md-3 col-lg-2">
+                        <label class="form-label small mb-0">Tipo</label>
+                        <select name="type" class="form-select form-select-sm">
+                            <option value="">Todos</option>
+                            <option value="income"   @selected(($woFilters['type'] ?? '') === 'income')>Receita</option>
+                            <option value="expense"  @selected(($woFilters['type'] ?? '') === 'expense')>Despesa</option>
+                            <option value="transfer" @selected(($woFilters['type'] ?? '') === 'transfer')>Transferência</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label class="form-label small mb-0">Empresa</label>
+                        <select name="company_id" class="form-select form-select-sm">
+                            <option value="">Todas</option>
+                            @foreach($companies ?? [] as $co)
+                                <option value="{{ $co->id }}" @selected(($woFilters['company_id'] ?? '') == $co->id)>{{ $co->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label class="form-label small mb-0">Categoria</label>
+                        <select name="category_id" class="form-select form-select-sm">
+                            <option value="">Todas</option>
+                            @foreach($categories ?? [] as $cat)
+                                <option value="{{ $cat->id }}" @selected(($woFilters['category_id'] ?? '') == $cat->id)>{{ $cat->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-lg-2">
+                        <label class="form-label small mb-0">Data de</label>
+                        <input type="date" name="date_from" class="form-control form-control-sm" value="{{ $woFilters['date_from'] ?? '' }}">
+                    </div>
+                    <div class="col-md-2 col-lg-2">
+                        <label class="form-label small mb-0">Data até</label>
+                        <input type="date" name="date_to" class="form-control form-control-sm" value="{{ $woFilters['date_to'] ?? '' }}">
+                    </div>
+                    <div class="col-md-3 col-lg-2 d-flex gap-1 align-items-end">
+                        <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Filtrar</button>
+                        <a href="{{ route('data-hygiene.index', ['tab' => 'without_operation']) }}" class="btn btn-sm btn-outline-secondary">Limpar</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @include('finance.data-hygiene._transaction_table', [
     'transactions' => $withoutOperation,
     'emptyMessage' => 'Nenhum lançamento sem operação.',

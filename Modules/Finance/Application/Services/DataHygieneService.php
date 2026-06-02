@@ -69,12 +69,41 @@ class DataHygieneService
                 ->whereHas('units'));
     }
 
-    public function withoutOperationQuery(int $workspaceId): Builder
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function withoutOperationQuery(int $workspaceId, array $filters = []): Builder
     {
-        return Transaction::query()
+        $query = Transaction::query()
             ->where('workspace_id', $workspaceId)
             ->whereNull('operation_id')
             ->with(['category', 'company']);
+
+        if (! empty($filters['description'])) {
+            $query->where('description', 'like', '%'.$filters['description'].'%');
+        }
+
+        if (! empty($filters['company_id'])) {
+            $query->where('company_id', (int) $filters['company_id']);
+        }
+
+        if (! empty($filters['type'])) {
+            $query->where('type', $filters['type']);
+        }
+
+        if (! empty($filters['category_id'])) {
+            $query->where('category_id', (int) $filters['category_id']);
+        }
+
+        if (! empty($filters['date_from'])) {
+            $query->whereDate('transaction_date', '>=', $filters['date_from']);
+        }
+
+        if (! empty($filters['date_to'])) {
+            $query->whereDate('transaction_date', '<=', $filters['date_to']);
+        }
+
+        return $query;
     }
 
     /**
