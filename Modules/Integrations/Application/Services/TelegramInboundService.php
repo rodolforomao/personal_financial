@@ -5,6 +5,7 @@ namespace Modules\Integrations\Application\Services;
 use App\Application\Services\PlatformOperationsGuide;
 use App\Core\Enums\TransactionStatus;
 use App\Core\Enums\TransactionType;
+use App\Core\Support\AudioTranscriptionService;
 use App\Core\Support\NotificationDestinationNormalizer;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +27,7 @@ class TelegramInboundService
         protected TelegramBackgroundCommandService $backgroundCommands,
         protected PlatformOperationsGuide $operationsGuide,
         protected StatementImportWorkflowService $statementImports,
+        protected AudioTranscriptionService $audioTranscription,
     ) {}
 
     /**
@@ -128,6 +130,30 @@ class TelegramInboundService
             }
         }
 
+        $voiceFileId = $this->extractVoiceFileId($message);
+        if ($voiceFileId && $this->audioTranscription->isAvailable()) {
+            $download = $this->telegram->downloadFile($voiceFileId, $token);
+            if ($download['ok'] ?? false) {
+                $transcription = $this->audioTranscription->transcribe($download['path']);
+                if (isset($download['path']) && is_file($download['path'])) {
+                    @unlink($download['path']);
+                }
+                if ($transcription) {
+                    $confirm = $this->receiptFlow->handleConfirmationText($user, 'telegram', $chatId, $transcription);
+                    if ($confirm) {
+                        $this->reply($chatId, "🎤 Entendi: \"{$transcription}\"\n\n".$confirm['reply'], $token);
+
+                        return ['handled' => true, 'reply' => 'voice_receipt_supplement'];
+                    }
+
+                    return $this->handleTextTransaction($user, $workspaceId, $chatId, $messageId, $transcription, $token, voiceTranscription: $transcription);
+                }
+            }
+            $this->reply($chatId, '🎤 Não consegui entender o áudio. Envie texto ou foto de comprovante.', $token);
+
+            return ['handled' => true, 'reply' => 'voice_failed'];
+        }
+
         $fileId = $this->extractInboundFileId($message);
         if ($fileId) {
             $download = $this->telegram->downloadFile($fileId, $token);
@@ -192,6 +218,7 @@ class TelegramInboundService
         string $messageId,
         string $text,
         string $token,
+        ?string $voiceTranscription = null,
     ): array {
         if ($this->receiptConfirmation->findPendingDraft($user, 'telegram', $chatId)) {
             $this->reply(
@@ -261,10 +288,11 @@ class TelegramInboundService
 
         $label = $intent['type'] === TransactionType::Income ? 'Receita' : 'Gasto';
         $amountFormatted = 'R$ '.number_format($intent['amount'], 2, ',', '.');
+        $voicePrefix = $voiceTranscription ? "🎤 Entendi: \"{$voiceTranscription}\"\n\n" : '';
 
         $this->reply(
             $chatId,
-            "✅ {$label} registrado (#{$transaction->id})\n".
+            "{$voicePrefix}✅ {$label} registrado (#{$transaction->id})\n".
             "Valor: {$amountFormatted}\n".
             "Descrição: {$intent['description']}\n".
             'Data: '.now()->format('d/m/Y'),
@@ -440,6 +468,19 @@ class TelegramInboundService
     protected function hasInboundDocument(array $message): bool
     {
         return $this->extractInboundFileId($message) !== null;
+    }
+
+    protected function extractVoiceFileId(array $message): ?string
+    {
+        if (! empty($message['voice']['file_id'])) {
+            return (string) $message['voice']['file_id'];
+        }
+
+        if (! empty($message['audio']['file_id'])) {
+            return (string) $message['audio']['file_id'];
+        }
+
+        return null;
     }
 
     protected function extractInboundFileId(array $message): ?string

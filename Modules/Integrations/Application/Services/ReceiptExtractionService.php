@@ -7,6 +7,7 @@ use App\Core\Enums\FundingSource;
 use App\Core\Enums\PaymentMethod;
 use App\Core\Enums\TransactionType;
 use App\Core\Support\BrazilianAmountParser;
+use App\Core\Support\CurrencyExchangeService;
 use App\Core\Support\PdfFirstPageRenderer;
 use RuntimeException;
 use Carbon\Carbon;
@@ -25,6 +26,7 @@ class ReceiptExtractionService
         protected PdfFirstPageRenderer $pdfRenderer,
         protected ReceiptCaptionContextResolver $captionContext,
         protected ReceiptDraftSupplementParser $supplementParser,
+        protected CurrencyExchangeService $currencyExchange,
     ) {}
 
     /**
@@ -256,8 +258,23 @@ class ReceiptExtractionService
             $suggestedCategory = $ocr['suggested_category'] ?? $ocr['suggestedCategory'] ?? null;
         }
 
-        $bestFromText = $this->amountParser->extractBestFromText($rawText, $filenameHint);
-        $amount = $this->reconcileAmount($amount, $bestFromText, $filenameHint);
+        $currency = $this->detectCurrency($structured ? $entities : null, $rawText);
+
+        if ($currency === 'USD') {
+            $usdAmount = $amount ?? $this->amountParser->extractUsdAmount($rawText);
+            $originalAmount = $usdAmount;
+            $exchangeRate = null;
+            if ($usdAmount !== null && $usdAmount > 0) {
+                $conversion = $this->currencyExchange->convertUsdToBrl($usdAmount);
+                $amount = $conversion['amount_brl'];
+                $exchangeRate = $conversion['rate'];
+            }
+        } else {
+            $originalAmount = null;
+            $exchangeRate = null;
+            $bestFromText = $this->amountParser->extractBestFromText($rawText, $filenameHint);
+            $amount = $this->reconcileAmount($amount, $bestFromText, $filenameHint);
+        }
 
         if ($description === '' || mb_strlen($description) < 3) {
             $description = $this->extractDescriptionFromText($rawText) ?: 'Comprovante via mensagem';
@@ -272,6 +289,9 @@ class ReceiptExtractionService
         return [
             'type' => $type->value,
             'amount' => $amount ?? 0.0,
+            'original_currency' => $currency,
+            'original_amount' => $originalAmount,
+            'exchange_rate' => $exchangeRate,
             'date' => $date ?? now()->toDateString(),
             'description' => mb_substr($description, 0, 500),
             'counterparty' => $counterparty,
@@ -650,6 +670,23 @@ class ReceiptExtractionService
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    protected function detectCurrency(?array $entities, string $rawText): string
+    {
+        if (is_array($entities)) {
+            $curr = strtoupper(trim((string) ($entities['currency'] ?? '')));
+            if (in_array($curr, ['USD', 'USDT'], true)) {
+                return 'USD';
+            }
+        }
+
+        if (preg_match('/\b(USD|USDT)\b/i', $rawText)
+            || preg_match('/\$\s*\d+[\.,]?\d*\s*(?:USD|USDT)/i', $rawText)) {
+            return 'USD';
+        }
+
+        return 'BRL';
     }
 
     protected function extractDescriptionFromText(string $text): string

@@ -75,6 +75,32 @@ class BrazilianAmountParser
     }
 
     /**
+     * Extrai o valor total em USD/USDT de um texto OCR.
+     * Prefere o valor associado a "Total", senão retorna o maior encontrado.
+     */
+    public function extractUsdAmount(string $text): ?float
+    {
+        $pattern = '/(?:total|sub\s*total|amount)[\s:]*\$?\s*(\d+(?:\.\d{1,2})?)\s*(?:USD|USDT)?/iu';
+        if (preg_match_all($pattern, $text, $matches)) {
+            $values = array_map('floatval', $matches[1]);
+            return round(max($values), 2);
+        }
+
+        // Fallback: any USD-marked value
+        if (preg_match_all('/\$\s*(\d+(?:\.\d{1,2})?)\s*(?:USD|USDT)/iu', $text, $matches)) {
+            $values = array_map('floatval', $matches[1]);
+            return round(max($values), 2);
+        }
+
+        if (preg_match_all('/(\d+(?:\.\d{1,2})?)\s*USD\b/iu', $text, $matches)) {
+            $values = array_map('floatval', $matches[1]);
+            return round(max($values), 2);
+        }
+
+        return null;
+    }
+
+    /**
      * Escolhe o melhor valor monetário no texto completo do OCR.
      */
     public function extractBestFromText(string $text, ?float $filenameHint = null): ?float

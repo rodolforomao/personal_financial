@@ -118,6 +118,11 @@ return [
         ],
     ],
 
+    'audio' => [
+        'python_binary' => env('AUDIO_PYTHON_BINARY', 'python3'),
+        'vosk_model_path' => env('VOSK_MODEL_PATH', base_path('scripts/vosk-model-pt')),
+    ],
+
     'integrations' => [
         // Credenciais padrão do servidor (modo "sistema" na UI /integrations/notifications)
         'system_enabled' => env('INTEGRATIONS_SYSTEM_ENABLED', true),

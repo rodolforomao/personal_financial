@@ -4,6 +4,7 @@ namespace Modules\Integrations\Application\Services;
 
 use App\Core\Enums\TransactionStatus;
 use App\Core\Enums\TransactionType;
+use App\Core\Support\AudioTranscriptionService;
 use App\Core\Support\NotificationDestinationNormalizer;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +25,7 @@ class WhatsAppInboundService
         protected TransactionDeduplicationService $deduplication,
         protected WhatsAppSenderPhoneResolver $phoneResolver,
         protected StatementImportWorkflowService $statementImports,
+        protected AudioTranscriptionService $audioTranscription,
     ) {}
 
     /**
@@ -71,6 +73,26 @@ class WhatsAppInboundService
 
                 return ['handled' => true, 'reply' => $replyKind];
             }
+        }
+
+        if (($parsed['is_audio'] ?? false) && $parsed['media_path'] && $this->audioTranscription->isAvailable()) {
+            $transcription = $this->audioTranscription->transcribe($parsed['media_path']);
+            if (is_file($parsed['media_path'])) {
+                @unlink($parsed['media_path']);
+            }
+            if ($transcription) {
+                $confirm = $this->receiptFlow->handleConfirmationText($user, 'whatsapp', $chatId, $transcription);
+                if ($confirm) {
+                    $this->reply($phone, "🎤 Entendi: \"{$transcription}\"\n\n".$confirm['reply']);
+
+                    return ['handled' => true, 'reply' => 'voice_receipt_supplement'];
+                }
+
+                return $this->handleTextLikeTelegram($user, $workspaceId, $chatId, $transcription, $phone, voiceTranscription: $transcription);
+            }
+            $this->reply($phone, '🎤 Não consegui entender o áudio. Envie texto ou foto de comprovante.');
+
+            return ['handled' => true, 'reply' => 'voice_failed'];
         }
 
         if ($parsed['inbound_media_missing'] ?? false) {
@@ -133,7 +155,7 @@ class WhatsAppInboundService
     /**
      * @return array{handled: bool, reply?: string}
      */
-    protected function handleTextLikeTelegram(User $user, int $workspaceId, string $chatId, string $text, string $phone): array
+    protected function handleTextLikeTelegram(User $user, int $workspaceId, string $chatId, string $text, string $phone, ?string $voiceTranscription = null): array
     {
         if ($this->receiptConfirmation->findPendingDraft($user, 'whatsapp', $chatId)) {
             $this->reply($phone, 'Você tem um comprovante aguardando confirmação. Responda SIM ou NÃO.');
@@ -189,10 +211,11 @@ class WhatsAppInboundService
 
         $label = $intent['type'] === TransactionType::Income ? 'Receita' : 'Gasto';
         $amountFormatted = 'R$ '.number_format($intent['amount'], 2, ',', '.');
+        $voicePrefix = $voiceTranscription ? "🎤 Entendi: \"{$voiceTranscription}\"\n\n" : '';
 
         $this->reply(
             $phone,
-            "✅ {$label} registrado (#{$transaction->id})\nValor: {$amountFormatted}\nDescrição: {$intent['description']}"
+            "{$voicePrefix}✅ {$label} registrado (#{$transaction->id})\nValor: {$amountFormatted}\nDescrição: {$intent['description']}"
         );
 
         return ['handled' => true, 'reply' => 'created'];
@@ -215,7 +238,7 @@ class WhatsAppInboundService
     }
 
     /**
-     * @return array{phone: string, text: string, caption: string, from_me: bool, message_id: ?string, media_path: ?string, mime: ?string, original_file_name?: ?string}|null
+     * @return array{phone: string, text: string, caption: string, from_me: bool, message_id: ?string, media_path: ?string, mime: ?string, original_file_name?: ?string, is_audio?: bool}|null
      */
     protected function parseEvolutionMessage(array $payload): ?array
     {
@@ -264,13 +287,20 @@ class WhatsAppInboundService
 
         $mediaPath = null;
         $mime = 'image/jpeg';
+        $isAudio = false;
 
         $base64 = $data['base64'] ?? $message['base64'] ?? data_get($data, 'message.base64') ?? null;
         if (is_string($base64) && $base64 !== '') {
             $mimeFromDoc = (string) data_get($message, 'documentMessage.mimetype', '');
-            $mime = $mimeFromDoc ?: $this->mimeFromFilename($originalFileName) ?: 'image/jpeg';
+            $mimeFromAudio = (string) data_get($message, 'audioMessage.mimetype', '');
+            $mime = $mimeFromDoc ?: $mimeFromAudio ?: $this->mimeFromFilename($originalFileName) ?: 'image/jpeg';
             $ext = $this->extensionForMime($mime, $originalFileName);
             $mediaPath = $this->saveBase64Media($base64, $ext);
+            $isAudio = $this->audioTranscription->isAudioMime($mime);
+        } elseif (isset($message['audioMessage'])) {
+            $mime = (string) data_get($message, 'audioMessage.mimetype', 'audio/ogg');
+            $mediaPath = $this->tryDownloadEvolutionMedia($data);
+            $isAudio = true;
         } elseif (isset($message['imageMessage']) || isset($message['documentMessage'])) {
             $docMime = (string) data_get($message, 'documentMessage.mimetype', '');
             if ($docMime !== '') {
@@ -297,6 +327,7 @@ class WhatsAppInboundService
             'mime' => $mime,
             'original_file_name' => $originalFileName !== '' ? $originalFileName : null,
             'inbound_media_missing' => $hasReceiptMedia && $mediaPath === null,
+            'is_audio' => $isAudio,
         ];
     }
 

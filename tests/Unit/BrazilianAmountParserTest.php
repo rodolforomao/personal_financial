@@ -49,4 +49,21 @@ class BrazilianAmountParserTest extends TestCase
         $hint = $this->parser->hintFromFilename('Rodolfo 5k.jpeg');
         $this->assertSame(5000.0, $this->parser->extractBestFromText($text, $hint));
     }
+
+    public function test_extracts_usd_total_from_invoice_text(): void
+    {
+        $text = "Sub Total \$42.22USD\nTotal \$42.22USD";
+        $this->assertSame(42.22, $this->parser->extractUsdAmount($text));
+    }
+
+    public function test_extracts_usd_amount_from_dollar_sign(): void
+    {
+        $text = 'Payment $1.23USD  Invoice total $42.22USD';
+        $this->assertSame(42.22, $this->parser->extractUsdAmount($text));
+    }
+
+    public function test_extracts_usd_from_plain_usd_suffix(): void
+    {
+        $this->assertSame(42.22, $this->parser->extractUsdAmount('42.22USD'));
+    }
 }

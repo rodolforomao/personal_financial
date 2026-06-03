@@ -159,10 +159,18 @@ class ReceiptConfirmationService
         $label = $type === TransactionType::Income ? 'Receita' : 'Gasto';
         $amountFormatted = 'R$ '.number_format($amount, 2, ',', '.');
 
+        $usdInfo = '';
+        if (($data['original_currency'] ?? 'BRL') === 'USD' && ($data['original_amount'] ?? 0) > 0) {
+            $usdAmt = number_format((float) $data['original_amount'], 2, '.', ',');
+            $rate = (float) ($data['exchange_rate'] ?? 0);
+            $rateStr = $rate > 0 ? ' | Cotação R$ '.number_format($rate, 4, ',', '.').' / USDT' : '';
+            $usdInfo = "\nOriginal: \${$usdAmt} USD{$rateStr}";
+        }
+
         return [
             'ok' => true,
             'message' => "✅ {$label} salvo (#{$transaction->id})\n".
-                "Valor: {$amountFormatted}\n".
+                "Valor: {$amountFormatted}{$usdInfo}\n".
                 "Descrição: {$description}\n".
                 'Data: '.Carbon::parse($date)->format('d/m/Y').
                 $receiptNote,
@@ -179,15 +187,28 @@ class ReceiptConfirmationService
             ? 'R$ '.number_format($amount, 2, ',', '.')
             : '(não identificado — confirme só se estiver correto no comprovante)';
 
+        $usdLine = '';
+        if (($d['original_currency'] ?? 'BRL') === 'USD' && ($d['original_amount'] ?? 0) > 0) {
+            $usdAmt = number_format((float) $d['original_amount'], 2, '.', ',');
+            $rate = (float) ($d['exchange_rate'] ?? 0);
+            $rateStr = $rate > 0 ? ' (cotação R$ '.number_format($rate, 4, ',', '.').' / USDT)' : '';
+            $usdLine = "Valor original: \${$usdAmt} USD/USDT{$rateStr}";
+        }
+
         $lines = [
             '📄 Li o comprovante. Está correto?',
             '',
             'Comprovante: '.($d['receipt_type_label'] ?? 'Bancário'),
             "Tipo lançamento: {$type}",
             "Valor: {$amountStr}",
-            'Data: '.(isset($d['date']) ? Carbon::parse($d['date'])->format('d/m/Y') : '—'),
-            'Descrição: '.($d['description'] ?? '—'),
         ];
+
+        if ($usdLine !== '') {
+            $lines[] = $usdLine;
+        }
+
+        $lines[] = 'Data: '.(isset($d['date']) ? Carbon::parse($d['date'])->format('d/m/Y') : '—');
+        $lines[] = 'Descrição: '.($d['description'] ?? '—');
 
         if (! empty($d['counterparty'])) {
             $lines[] = 'Contraparte: '.$d['counterparty'];

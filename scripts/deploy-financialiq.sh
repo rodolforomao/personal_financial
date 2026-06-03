@@ -166,7 +166,36 @@ if ! mysql -e "SHOW DATABASES LIKE '\$EVO_DB';" | grep -q "\$EVO_DB"; then
   /usr/local/hestia/bin/v-add-database \$WEBUSER evolution evolution "\$EVO_PASS" mysql localhost utf8mb4
 fi
 
-command -v tesseract >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y tesseract-ocr tesseract-ocr-por poppler-utils
+command -v tesseract >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y tesseract-ocr tesseract-ocr-por poppler-utils
+command -v ffmpeg   >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y ffmpeg
+command -v python3  >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-pip
+command -v curl     >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y curl
+command -v unzip    >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y unzip
+
+# pacote vosk (STT offline para transcricao de audio)
+if ! python3 -c "import vosk" 2>/dev/null; then
+  echo "    Instalando vosk..."
+  python3 -m pip install --quiet vosk 2>/dev/null \
+    || python3 -m pip install --quiet --break-system-packages vosk
+else
+  echo "    vosk ja instalado, pulando."
+fi
+
+# modelo Vosk Portugues (persiste entre deploys via exclude no rsync)
+VOSK_MODEL="\$REMOTE/scripts/vosk-model-pt"
+mkdir -p "\$REMOTE/scripts"
+if [[ ! -d "\$VOSK_MODEL" ]]; then
+  echo "    Baixando modelo Vosk Portugues (~33MB)..."
+  VOSK_TMP=\$(mktemp --suffix=.zip)
+  curl -fsSL "https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip" -o "\$VOSK_TMP"
+  unzip -q "\$VOSK_TMP" -d "\$REMOTE/scripts"
+  mv "\$REMOTE/scripts/vosk-model-small-pt-0.3" "\$VOSK_MODEL"
+  rm -f "\$VOSK_TMP"
+  chown -R \$WEBUSER:\$WEBUSER "\$VOSK_MODEL"
+  echo "    Modelo Vosk instalado em \$VOSK_MODEL"
+else
+  echo "    Modelo Vosk ja instalado, pulando."
+fi
 
 mkdir -p \
   "\$REMOTE/storage/app/private" \
@@ -207,6 +236,7 @@ rsync -avz --delete -e "$RSYNC_RSH" \
   --exclude 'storage/framework/sessions/*' \
   --exclude 'storage/framework/views/*' \
   --exclude 'storage/backups/*' \
+  --exclude 'scripts/vosk-model-pt' \
   "$ROOT/" "$SSH_USER@$SSH_HOST:$REMOTE_DIR/"
 
 echo "==> Fase 4: .env producao no servidor"
