@@ -76,6 +76,7 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::post('data-hygiene/fix', [DataHygieneController::class, 'applyFix'])->name('data-hygiene.fix');
         Route::post('data-hygiene/bulk-assign', [DataHygieneController::class, 'bulkAssign'])->name('data-hygiene.bulk-assign');
         Route::post('data-hygiene/auto-assign-operations', [DataHygieneController::class, 'autoAssignOperations'])->name('data-hygiene.auto-assign-operations');
+        Route::post('data-hygiene/dismiss-duplicate', [DataHygieneController::class, 'dismissDuplicate'])->name('data-hygiene.dismiss-duplicate');
 
         Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
         Route::post('categories', [CategoryController::class, 'store'])->name('categories.store');
@@ -104,6 +105,8 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::post('transactions/{transaction}/mirror-personal', [TransactionController::class, 'createPersonalMirror'])->name('transactions.mirror-personal');
         Route::post('transactions/{transaction}/criar-recorrente', [TransactionController::class, 'createRecurring'])->name('transactions.create-recurring');
         Route::post('transactions/{transaction}/desvincular-recorrente', [TransactionController::class, 'unlinkRecurring'])->name('transactions.unlink-recurring');
+        Route::post('transactions/{transaction}/vincular-clt', [TransactionController::class, 'linkCltSalary'])->name('transactions.link-clt');
+        Route::post('transactions/{transaction}/desvincular-clt', [TransactionController::class, 'unlinkCltSalary'])->name('transactions.unlink-clt');
         Route::post('transactions/{transaction}/receipts/extract', [ReceiptExtractController::class, 'storeAndPrefill'])->name('transactions.receipts.extract');
         Route::post('transactions/{transaction}/receipts', [TransactionReceiptController::class, 'store'])->name('transactions.receipts.store');
         Route::post('transactions/{transaction}/receipts/link', [TransactionReceiptController::class, 'link'])->name('transactions.receipts.link');

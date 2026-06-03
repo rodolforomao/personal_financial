@@ -19,9 +19,12 @@ use Modules\Categorization\Infrastructure\Models\Category;
 use Modules\Companies\Infrastructure\Models\Company;
 use Modules\Finance\Application\Actions\CreateTransactionAction;
 use Modules\Finance\Application\DTOs\CreateTransactionData;
+use Modules\Finance\Application\Services\CltSalaryService;
 use Modules\Finance\Application\Services\TransactionBulkActionService;
 use Modules\Finance\Application\Services\TransactionEstornoPairCleanupService;
 use Modules\Finance\Application\Services\TransactionIndexFilterService;
+use Modules\Finance\Infrastructure\Models\CltSalary;
+use Modules\Finance\Infrastructure\Models\CltSalaryPeriod;
 use Modules\Finance\Infrastructure\Models\RecurringItem;
 use Modules\Finance\Infrastructure\Models\Transaction;
 use Modules\OCR\Infrastructure\Models\Document;
@@ -420,8 +423,10 @@ class TransactionController extends Controller
         $this->authorize('update', $transaction);
         $workspaceId = (int) $request->attributes->get('workspace_id');
 
+        $transaction->load(['category', 'company', 'operation', 'operationUnit', 'documents', 'linkedTransaction', 'recurringItem.company', 'cltSalaryPeriod.cltSalary.company']);
+
         return view('finance.transactions.edit', [
-            'transaction' => $transaction->load(['category', 'company', 'operation', 'operationUnit', 'documents', 'linkedTransaction', 'recurringItem.company']),
+            'transaction' => $transaction,
             'categories' => Category::query()->where('workspace_id', $workspaceId)->orderBy('name')->get(),
             'companies' => Company::query()->where('workspace_id', $workspaceId)->orderBy('name')->get(),
             'operations' => $this->operationsForForm($workspaceId),
@@ -432,6 +437,12 @@ class TransactionController extends Controller
                 ->limit(30)
                 ->get(),
             'requirePassword' => config('financial.security.require_password_for_transaction_sensitive_edit', true),
+            'cltSalaries' => CltSalary::query()
+                ->where('workspace_id', $workspaceId)
+                ->where('is_active', true)
+                ->with('company')
+                ->orderBy('id')
+                ->get(),
         ]);
     }
 
@@ -690,6 +701,38 @@ class TransactionController extends Controller
         return redirect()
             ->route('transactions.edit', $transaction)
             ->with('success', 'Vínculo com receita recorrente removido deste lançamento.');
+    }
+
+    public function linkCltSalary(Request $request, Transaction $transaction, CltSalaryService $service): RedirectResponse
+    {
+        $this->authorize('update', $transaction);
+
+        $workspaceId = (int) $request->attributes->get('workspace_id');
+
+        $validated = $request->validate([
+            'clt_salary_period_id' => 'required|integer',
+        ]);
+
+        $period = CltSalaryPeriod::query()
+            ->whereHas('cltSalary', fn ($q) => $q->where('workspace_id', $workspaceId))
+            ->findOrFail($validated['clt_salary_period_id']);
+
+        $service->linkExistingTransaction($transaction, $period, $request->user());
+
+        return redirect()
+            ->route('transactions.edit', $transaction)
+            ->with('success', 'Transação vinculada ao salário CLT.');
+    }
+
+    public function unlinkCltSalary(Request $request, Transaction $transaction, CltSalaryService $service): RedirectResponse
+    {
+        $this->authorize('update', $transaction);
+
+        $service->unlinkTransaction($transaction);
+
+        return redirect()
+            ->route('transactions.edit', $transaction)
+            ->with('success', 'Vínculo com salário CLT removido.');
     }
 
     public function destroy(Request $request, Transaction $transaction): RedirectResponse

@@ -16,13 +16,14 @@ class DataHygieneService
         'Residencial Oliveiras',
     ];
 
-    public function audit(int $workspaceId): array
+    public function audit(int $workspaceId, ?DuplicateTransactionService $duplicates = null): array
     {
         $geral = $this->geralOperation($workspaceId);
 
         return [
             'without_operation' => $this->countWithoutOperation($workspaceId),
             'without_unit_in_ops_with_units' => $this->countMissingUnit($workspaceId),
+            'duplicate_groups' => $duplicates?->countGroups($workspaceId) ?? 0,
             'geral_operation' => $geral ? [
                 'id' => $geral->id,
                 'name' => $geral->name,

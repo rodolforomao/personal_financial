@@ -2,18 +2,19 @@
 
 namespace Modules\Finance\Application\Services;
 
+use App\Core\Enums\AlertSeverity;
 use App\Core\Enums\TransactionStatus;
 use App\Core\Enums\TransactionType;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Modules\Alerts\Infrastructure\Models\Alert;
-use App\Core\Enums\AlertSeverity;
 use Modules\Categorization\Infrastructure\Models\Category;
 use Modules\Finance\Application\Actions\CreateTransactionAction;
 use Modules\Finance\Application\DTOs\CreateTransactionData;
 use Modules\Finance\Infrastructure\Models\CltSalary;
 use Modules\Finance\Infrastructure\Models\CltSalaryPeriod;
+use Modules\Finance\Infrastructure\Models\Transaction;
 
 class CltSalaryService
 {
@@ -189,6 +190,76 @@ class CltSalaryService
         $this->markAlertsRead($salary->workspace_id, $period->id);
 
         return ['period' => $period->fresh(), 'transaction_id' => $transaction->id];
+    }
+
+    /**
+     * Vincula uma transação já existente a um período CLT.
+     * Permite vincular a períodos pendentes ou confirmados sem transação.
+     */
+    public function linkExistingTransaction(Transaction $transaction, CltSalaryPeriod $period, User $user): void
+    {
+        abort_if(
+            $period->status === CltSalaryPeriod::STATUS_SKIPPED,
+            422,
+            'Não é possível vincular uma transação a um período ignorado.',
+        );
+        abort_if(
+            $period->transaction_id && $period->transaction_id !== $transaction->id,
+            422,
+            'Este período já está vinculado a outra transação.',
+        );
+
+        $salary = $period->cltSalary()->with('company')->firstOrFail();
+        $ref = Carbon::parse($period->reference_month);
+
+        $period->update([
+            'status' => CltSalaryPeriod::STATUS_CONFIRMED,
+            'transaction_id' => $transaction->id,
+            'confirmed_at' => now(),
+            'confirmed_by' => $user->id,
+        ]);
+
+        $existingMeta = (array) ($transaction->metadata ?? []);
+        $transaction->update([
+            'source' => 'clt_salary',
+            'metadata' => array_merge($existingMeta, [
+                'clt_salary_id' => $salary->id,
+                'clt_salary_period_id' => $period->id,
+                'gross_amount' => $period->gross_amount,
+                'net_amount' => $period->net_amount,
+                'reference_month' => $ref->toDateString(),
+            ]),
+        ]);
+
+        $this->markAlertsRead($salary->workspace_id, $period->id);
+    }
+
+    /**
+     * Remove o vínculo entre uma transação e seu período CLT.
+     * O período volta a pending para nova confirmação.
+     */
+    public function unlinkTransaction(Transaction $transaction): void
+    {
+        $period = CltSalaryPeriod::query()
+            ->where('transaction_id', $transaction->id)
+            ->first();
+
+        if ($period) {
+            $period->update([
+                'status' => CltSalaryPeriod::STATUS_PENDING,
+                'transaction_id' => null,
+                'confirmed_at' => null,
+                'confirmed_by' => null,
+            ]);
+        }
+
+        $meta = (array) ($transaction->metadata ?? []);
+        unset($meta['clt_salary_id'], $meta['clt_salary_period_id'], $meta['reference_month']);
+
+        $transaction->update([
+            'source' => 'manual',
+            'metadata' => $meta ?: null,
+        ]);
     }
 
     public function skipPeriod(CltSalaryPeriod $period): void

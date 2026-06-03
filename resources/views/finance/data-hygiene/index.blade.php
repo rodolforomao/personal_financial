@@ -22,6 +22,14 @@
             Sem unidade <span class="badge text-bg-warning">{{ $audit['without_unit_in_ops_with_units'] }}</span>
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link @if($tab === 'duplicates') active @endif" href="{{ route('data-hygiene.index', ['tab' => 'duplicates']) }}">
+            Possíveis duplicatas
+            @if($audit['duplicate_groups'] > 0)
+                <span class="badge text-bg-danger">{{ $audit['duplicate_groups'] }}</span>
+            @endif
+        </a>
+    </li>
 </ul>
 
 @if($tab === 'overview')
@@ -50,6 +58,17 @@
                 <h3>{{ count($audit['wrong_company_types']) }}</h3>
                 <p>Tipos de empresa a revisar</p>
             </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="small-box {{ $audit['duplicate_groups'] > 0 ? 'text-bg-danger' : 'text-bg-secondary' }}">
+            <div class="inner">
+                <h3>{{ $audit['duplicate_groups'] }}</h3>
+                <p>Possíveis duplicatas</p>
+            </div>
+            @if($audit['duplicate_groups'] > 0)
+                <a href="{{ route('data-hygiene.index', ['tab' => 'duplicates']) }}" class="small-box-footer">Revisar <i class="bi bi-arrow-circle-right"></i></a>
+            @endif
         </div>
     </div>
 </div>
@@ -320,4 +339,104 @@
 </script>
 @endpush
 @endif
+
+@if($tab === 'duplicates')
+
+@if($duplicateGroups->isEmpty())
+    <div class="alert alert-success d-flex align-items-center gap-2">
+        <i class="bi bi-check-circle-fill fs-5 flex-shrink-0"></i>
+        <div>Nenhum lançamento possivelmente duplicado encontrado. Base de dados limpa.</div>
+    </div>
+@else
+    <div class="alert alert-light border mb-3 small">
+        <i class="bi bi-info-circle"></i>
+        Exibindo até 60 grupos. Lançamentos com <strong>mesmo valor e datas próximas</strong> são listados para revisão.
+        Use <strong>"Não é duplicata"</strong> para ocultar falsos positivos.
+        Para excluir um lançamento, abra-o pelo botão <strong>Editar</strong>.
+    </div>
+
+    @foreach($duplicateGroups as $group)
+    @php
+        $txList = $group['transactions'];
+        $ids    = $txList->pluck('id')->sort()->values();
+        $badgeColor = match($group['confidence']) {
+            'high'   => 'danger',
+            'medium' => 'warning',
+            default  => 'secondary',
+        };
+        $badgeLabel = match($group['confidence']) {
+            'high'   => 'Alta confiança',
+            'medium' => 'Média confiança',
+            default  => 'Baixa confiança',
+        };
+    @endphp
+    <div class="card card-outline card-{{ $badgeColor === 'danger' ? 'danger' : ($badgeColor === 'warning' ? 'warning' : 'secondary') }} mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <span class="badge text-bg-{{ $badgeColor }} me-2">{{ $badgeLabel }}</span>
+                <span class="small">{{ $group['reason'] }}</span>
+            </div>
+            <form method="POST" action="{{ route('data-hygiene.dismiss-duplicate') }}">
+                @csrf
+                <input type="hidden" name="id1" value="{{ $ids[0] }}">
+                <input type="hidden" name="id2" value="{{ $ids[1] }}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary"
+                        title="Ocultar este par — não é duplicata">
+                    <i class="bi bi-x-lg"></i> Não é duplicata
+                </button>
+            </form>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data</th>
+                        <th>Descrição</th>
+                        <th>Contraparte</th>
+                        <th>Empresa</th>
+                        <th>Categoria</th>
+                        <th>Tipo</th>
+                        <th class="text-end">Valor</th>
+                        <th>Status</th>
+                        <th>Origem</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($txList as $tx)
+                    <tr>
+                        <td class="text-nowrap">{{ $tx->transaction_date->format('d/m/Y') }}</td>
+                        <td>{{ Str::limit($tx->description, 45) }}</td>
+                        <td class="text-muted small">{{ $tx->counterparty ? Str::limit($tx->counterparty, 25) : '—' }}</td>
+                        <td class="small">{{ $tx->company?->name ?? '—' }}</td>
+                        <td class="small">{{ $tx->category?->name ?? '—' }}</td>
+                        <td>
+                            <span class="badge text-bg-{{ $tx->type->value === 'income' ? 'success' : ($tx->type->value === 'expense' ? 'danger' : 'secondary') }}">
+                                {{ match($tx->type->value) { 'income' => 'Receita', 'expense' => 'Despesa', default => 'Transfer.' } }}
+                            </span>
+                        </td>
+                        <td class="text-end text-nowrap">R$ {{ number_format($tx->amount, 2, ',', '.') }}</td>
+                        <td class="small">
+                            @php $st = $tx->status->value ?? $tx->status; @endphp
+                            <span class="badge text-bg-{{ $st === 'confirmed' ? 'success' : ($st === 'pending' ? 'warning' : 'secondary') }}">
+                                {{ match($st) { 'confirmed' => 'Confirmado', 'pending' => 'Pendente', 'cancelled' => 'Cancelado', 'reconciled' => 'Conciliado', default => $st } }}
+                            </span>
+                        </td>
+                        <td class="small text-muted">{{ $tx->source !== 'manual' ? $tx->source : '' }}</td>
+                        <td class="text-end">
+                            <a href="{{ route('transactions.edit', $tx) }}" class="btn btn-xs btn-outline-secondary btn-sm">
+                                Editar
+                            </a>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endforeach
+@endif
+
+@endif
+
 @endsection

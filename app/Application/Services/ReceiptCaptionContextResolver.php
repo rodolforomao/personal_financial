@@ -248,19 +248,7 @@ class ReceiptCaptionContextResolver
 
     public function findCompanyByName(int $workspaceId, string $needle): ?Company
     {
-        $needle = trim($needle);
-        if ($needle === '') {
-            return null;
-        }
-
-        return Company::query()
-            ->where('workspace_id', $workspaceId)
-            ->where(function ($q) use ($needle) {
-                $q->whereRaw('LOWER(name) = ?', [mb_strtolower($needle)])
-                    ->orWhereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($needle).'%']);
-            })
-            ->orderByRaw('CASE WHEN LOWER(name) = ? THEN 0 ELSE 1 END', [mb_strtolower($needle)])
-            ->first();
+        return app(CompanyMatchingService::class)->findByName($workspaceId, $needle);
     }
 
     public function findOperationByName(int $workspaceId, string $needle, ?Company $company = null): ?Operation

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Finance\Application\DTOs\DashboardFilter;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\OCR\Infrastructure\Models\Document;
 use Modules\Categorization\Infrastructure\Models\Category;
@@ -144,6 +145,11 @@ class Transaction extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class);
+    }
+
+    public function cltSalaryPeriod(): HasOne
+    {
+        return $this->hasOne(CltSalaryPeriod::class, 'transaction_id');
     }
 
     public function fundingSourceLabel(): ?string

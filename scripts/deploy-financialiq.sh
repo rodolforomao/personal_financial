@@ -172,7 +172,16 @@ command -v python3  >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get in
 command -v curl     >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y curl
 command -v unzip    >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y unzip
 
-# pacote vosk (STT offline para transcricao de audio)
+# pacote openai (Whisper API para transcricao de audio)
+if ! python3 -c "import openai" 2>/dev/null; then
+  echo "    Instalando openai..."
+  python3 -m pip install --quiet openai 2>/dev/null \
+    || python3 -m pip install --quiet --break-system-packages openai
+else
+  echo "    openai ja instalado, pulando."
+fi
+
+# pacote vosk (STT offline — fallback quando AUDIO_PROVIDER=vosk)
 if ! python3 -c "import vosk" 2>/dev/null; then
   echo "    Instalando vosk..."
   python3 -m pip install --quiet vosk 2>/dev/null \

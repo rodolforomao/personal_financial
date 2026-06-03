@@ -2,6 +2,7 @@
 
 namespace Modules\Categorization\Application\Services;
 
+use App\Application\Services\CompanyMatchingService;
 use App\Core\Enums\TransactionType;
 use App\Core\Support\FeatureFlag;
 use Illuminate\Support\Str;
@@ -9,6 +10,8 @@ use Illuminate\Support\Collection;
 use Modules\Categorization\Infrastructure\Models\Category;
 use Modules\Categorization\Infrastructure\Models\CategorizationRule;
 use Modules\Categorization\Infrastructure\Models\CategorizationRuleAssignment;
+use Modules\Finance\Infrastructure\Models\CltSalary;
+use Modules\Finance\Infrastructure\Models\RecurringItem;
 use Modules\Intelligence\Application\Services\FinancialIntelligenceService;
 
 class CategorizationService
@@ -25,18 +28,53 @@ class CategorizationService
     ): ?array {
         $haystack = $this->normalizeText(trim("{$description} {$counterparty}"));
 
-        $ruleSuggestion = $this->suggestFromRules($workspaceId, $description, $counterparty, $transactionType);
-        if ($ruleSuggestion) {
-            return $ruleSuggestion;
+        $suggestion = $this->suggestFromRules($workspaceId, $description, $counterparty, $transactionType);
+
+        if (! $suggestion) {
+            if (FeatureFlag::enabled('ai_categorization', $workspaceId) && $this->intelligence) {
+                $ai = $this->intelligence->suggestCategory($workspaceId, $description, $counterparty);
+                $suggestion = $this->normalize($workspaceId, is_array($ai) ? $ai : null);
+            } else {
+                $suggestion = $this->normalize($workspaceId, $this->defaultPatterns($haystack));
+            }
         }
 
-        if (FeatureFlag::enabled('ai_categorization', $workspaceId) && $this->intelligence) {
-            $ai = $this->intelligence->suggestCategory($workspaceId, $description, $counterparty);
-
-            return $this->normalize($workspaceId, is_array($ai) ? $ai : null);
+        // Resolve company_id from counterparty when rules didn't assign one
+        if ($suggestion && empty($suggestion['company_id']) && $counterparty !== null && $counterparty !== '') {
+            $company = app(CompanyMatchingService::class)->findByName($workspaceId, $counterparty);
+            if ($company) {
+                $suggestion['company_id'] = $company->id;
+            }
         }
 
-        return $this->normalize($workspaceId, $this->defaultPatterns($haystack));
+        // Enrich with CLT salary and recurring item when company is known
+        if ($suggestion && ! empty($suggestion['company_id'])) {
+            $companyId = (int) $suggestion['company_id'];
+
+            if (empty($suggestion['clt_salary_id'])) {
+                $clt = CltSalary::query()
+                    ->where('workspace_id', $workspaceId)
+                    ->where('company_id', $companyId)
+                    ->where('is_active', true)
+                    ->value('id');
+                if ($clt) {
+                    $suggestion['clt_salary_id'] = (int) $clt;
+                }
+            }
+
+            if (empty($suggestion['recurring_item_id'])) {
+                $recurring = RecurringItem::query()
+                    ->where('workspace_id', $workspaceId)
+                    ->where('company_id', $companyId)
+                    ->where('is_active', true)
+                    ->value('id');
+                if ($recurring) {
+                    $suggestion['recurring_item_id'] = (int) $recurring;
+                }
+            }
+        }
+
+        return $suggestion;
     }
 
     /**

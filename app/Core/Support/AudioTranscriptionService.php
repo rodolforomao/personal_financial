@@ -11,9 +11,16 @@ class AudioTranscriptionService
     {
         $python = config('financial.audio.python_binary', 'python3');
         $script = base_path('scripts/audio_transcribe.py');
-        $modelPath = config('financial.audio.vosk_model_path', base_path('scripts/vosk-model-pt'));
 
-        $result = Process::env(['VOSK_MODEL_PATH' => $modelPath])
+        $env = [
+            'AUDIO_PROVIDER'  => config('financial.audio.provider', 'openai'),
+            'OPENAI_API_KEY'  => config('financial.ai.openai.api_key', ''),
+            'OPENAI_BASE_URL' => config('financial.ai.openai.base_url', 'https://api.openai.com/v1'),
+            'WHISPER_MODEL'   => config('financial.audio.whisper_model', 'whisper-1'),
+            'VOSK_MODEL_PATH' => config('financial.audio.vosk_model_path', base_path('scripts/vosk-model-pt')),
+        ];
+
+        $result = Process::env($env)
             ->run([$python, $script, $audioPath]);
 
         $output = trim($result->output());
@@ -40,9 +47,18 @@ class AudioTranscriptionService
     public function isAvailable(): bool
     {
         $script = base_path('scripts/audio_transcribe.py');
-        $modelPath = config('financial.audio.vosk_model_path', base_path('scripts/vosk-model-pt'));
 
-        return is_file($script) && is_dir($modelPath);
+        if (! is_file($script)) {
+            return false;
+        }
+
+        $provider = config('financial.audio.provider', 'openai');
+
+        if ($provider === 'openai') {
+            return ! empty(config('financial.ai.openai.api_key'));
+        }
+
+        return is_dir(config('financial.audio.vosk_model_path', base_path('scripts/vosk-model-pt')));
     }
 
     public function isAudioMime(string $mime): bool

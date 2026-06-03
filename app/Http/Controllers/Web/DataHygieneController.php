@@ -10,12 +10,13 @@ use Modules\Categorization\Application\Services\BulkCategorizeTransactionsServic
 use Modules\Categorization\Infrastructure\Models\Category;
 use Modules\Companies\Infrastructure\Models\Company;
 use Modules\Finance\Application\Services\DataHygieneService;
+use Modules\Finance\Application\Services\DuplicateTransactionService;
 use Modules\Finance\Application\Services\TransactionBulkActionService;
 use Modules\Operations\Infrastructure\Models\Operation;
 
 class DataHygieneController extends Controller
 {
-    public function index(Request $request, DataHygieneService $hygiene): View
+    public function index(Request $request, DataHygieneService $hygiene, DuplicateTransactionService $duplicates): View
     {
         $workspaceId = (int) $request->attributes->get('workspace_id');
         $tab = $request->input('tab', 'overview');
@@ -23,9 +24,12 @@ class DataHygieneController extends Controller
         $woFilters = $request->only(['description', 'company_id', 'type', 'category_id', 'date_from', 'date_to']);
         $woFiltersActive = array_filter($woFilters) !== [];
 
+        $duplicateGroups = $tab === 'duplicates' ? $duplicates->findGroups($workspaceId) : collect();
+
         return view('finance.data-hygiene.index', [
             'tab' => $tab,
-            'audit' => $hygiene->audit($workspaceId),
+            'audit' => $hygiene->audit($workspaceId, $duplicates),
+            'duplicateGroups' => $duplicateGroups,
             'unitWarnings' => $hygiene->suspiciousOperationUnits($workspaceId),
             'withoutOperation' => $hygiene->withoutOperationQuery($workspaceId, $woFilters)
                 ->latest('transaction_date')
@@ -136,6 +140,22 @@ class DataHygieneController extends Controller
         return redirect()
             ->route('data-hygiene.index', ['tab' => 'without_operation'])
             ->with('success', $msg);
+    }
+
+    public function dismissDuplicate(Request $request, DuplicateTransactionService $duplicates): RedirectResponse
+    {
+        $workspaceId = (int) $request->attributes->get('workspace_id');
+
+        $validated = $request->validate([
+            'id1' => 'required|integer',
+            'id2' => 'required|integer',
+        ]);
+
+        $duplicates->dismiss($workspaceId, (int) $validated['id1'], (int) $validated['id2']);
+
+        return redirect()
+            ->route('data-hygiene.index', ['tab' => 'duplicates'])
+            ->with('success', 'Par marcado como não duplicado.');
     }
 
     protected function messageCompanyTypes(int $fixed): string

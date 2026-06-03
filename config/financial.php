@@ -120,6 +120,8 @@ return [
 
     'audio' => [
         'python_binary' => env('AUDIO_PYTHON_BINARY', 'python3'),
+        'provider' => env('AUDIO_PROVIDER', 'openai'), // 'openai' (Whisper API) ou 'vosk' (offline)
+        'whisper_model' => env('WHISPER_MODEL', 'whisper-1'),
         'vosk_model_path' => env('VOSK_MODEL_PATH', base_path('scripts/vosk-model-pt')),
     ],
 

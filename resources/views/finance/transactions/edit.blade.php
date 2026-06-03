@@ -174,6 +174,11 @@
     </form>
 </div>
 
+@include('finance.transactions._clt_salary_link', [
+    'transaction' => $transaction,
+    'cltSalaries' => $cltSalaries,
+])
+
 @include('finance.transactions._recurring_income', ['transaction' => $transaction])
 
 @include('finance.transactions._receipts', [
