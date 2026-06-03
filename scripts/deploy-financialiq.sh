@@ -361,7 +361,13 @@ echo "==> Fase 8: migrations, seeders idempotentes e cache"
 RUN "REMOTE_DIR='$REMOTE_DIR' DEPLOY_PHP_BIN='$DEPLOY_PHP_BIN' DEPLOY_WEB_USER='$DEPLOY_WEB_USER' PHP_VERSION='$PHP_VERSION' bash -s" <<'REMOTE_ARTISAN'
 set -euo pipefail
 cd "$REMOTE_DIR"
-sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan migrate --force
+PENDING_MIGRATIONS=$(sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan migrate:status --pending 2>/dev/null | grep -c 'Pending' || true)
+if [[ "$PENDING_MIGRATIONS" -gt 0 ]]; then
+  echo "    $PENDING_MIGRATIONS migration(s) pendente(s) — executando migrate..."
+  sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan migrate --force
+else
+  echo "    Nenhuma migration pendente — pulando."
+fi
 sudo -u "$DEPLOY_WEB_USER" "$DEPLOY_PHP_BIN" artisan db:seed --class=Database\\Seeders\\FinancialPlatformSeeder --force
 
 DB_NAME="$(grep '^DB_DATABASE=' "$REMOTE_DIR/.env" | cut -d= -f2 | tr -d '\"')"

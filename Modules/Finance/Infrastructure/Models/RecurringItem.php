@@ -12,6 +12,7 @@ class RecurringItem extends Model
 {
     protected $fillable = [
         'workspace_id', 'category_id', 'company_id', 'type', 'title', 'amount',
+        'amount_index', 'amount_factor',
         'frequency', 'day_of_month', 'next_due_at', 'last_occurrence_at',
         'is_active', 'alert_enabled',
     ];
@@ -19,12 +20,18 @@ class RecurringItem extends Model
     protected function casts(): array
     {
         return [
-            'amount' => 'decimal:2',
-            'next_due_at' => 'date',
+            'amount'        => 'decimal:2',
+            'amount_factor' => 'decimal:6',
+            'next_due_at'   => 'date',
             'last_occurrence_at' => 'date',
-            'is_active' => 'boolean',
+            'is_active'     => 'boolean',
             'alert_enabled' => 'boolean',
         ];
+    }
+
+    public function hasIndexedAmount(): bool
+    {
+        return $this->amount_index !== null && $this->amount_factor !== null;
     }
 
     public function workspace(): BelongsTo
