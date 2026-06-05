@@ -240,6 +240,35 @@
         </div>
 
         <div class="card mb-4">
+            <div class="card-header"><h3 class="card-title"><i class="bi bi-robot"></i> IA para leitura de mensagens</h3></div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Quando habilitado, o sistema usa IA (Vision API e Whisper) para <strong>ler comprovantes em foto</strong>
+                    e <strong>transcrever áudios</strong> recebidos pelo Telegram e WhatsApp.
+                    Isso <strong>consome tokens</strong> — ative somente se quiser usar essas funcionalidades.
+                </p>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="inbound_ai_enabled" value="1" id="inbound-ai"
+                        @checked($status['inbound_ai_enabled'])>
+                    <label class="form-check-label" for="inbound-ai">
+                        <strong>Habilitar IA para ler comprovantes (foto/áudio) via Telegram e WhatsApp</strong>
+                    </label>
+                </div>
+                @if(!$status['inbound_ai_enabled'])
+                    <small class="text-muted d-block mt-2">
+                        <i class="bi bi-info-circle"></i>
+                        Desabilitado — comprovantes só serão lidos via OCR local (Tesseract) e áudios serão ignorados.
+                    </small>
+                @else
+                    <small class="text-success d-block mt-2">
+                        <i class="bi bi-check-circle"></i>
+                        Habilitado — Vision API e Whisper ativos para mensagens recebidas.
+                    </small>
+                @endif
+            </div>
+        </div>
+
+        <div class="card mb-4">
             <div class="card-header"><h3 class="card-title"><i class="bi bi-envelope"></i> Gmail</h3></div>
             <div class="card-body">
                 <p class="text-muted small">

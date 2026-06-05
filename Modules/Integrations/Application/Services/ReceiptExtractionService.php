@@ -37,6 +37,7 @@ class ReceiptExtractionService
         string $mimeType,
         int $workspaceId,
         ?string $originalFileName = null,
+        bool $aiEnabled = true,
     ): array {
         if ($this->isXml($mimeType, $filePath, $originalFileName)) {
             return $this->extractFromFiscalXml($filePath, $originalFileName);
@@ -53,14 +54,27 @@ class ReceiptExtractionService
         }
 
         try {
-            $provider = $this->preferredProvider();
-            $result = $this->ocrManager->driver($provider)->extract(new OcrRequestData(
-                filePath: $ocrPath,
-                mimeType: $ocrMime,
-                workspaceId: $workspaceId,
-            ));
+            $provider = $this->preferredProvider($aiEnabled);
+            try {
+                $result = $this->ocrManager->driver($provider)->extract(new OcrRequestData(
+                    filePath: $ocrPath,
+                    mimeType: $ocrMime,
+                    workspaceId: $workspaceId,
+                ));
+            } catch (\Throwable $primaryError) {
+                if ($provider === 'vision') {
+                    Log::warning('Vision OCR failed, falling back to tesseract', ['error' => $primaryError->getMessage()]);
+                    $result = $this->ocrManager->driver('tesseract')->extract(new OcrRequestData(
+                        filePath: $ocrPath,
+                        mimeType: $ocrMime,
+                        workspaceId: $workspaceId,
+                    ));
+                } else {
+                    throw $primaryError;
+                }
+            }
 
-            if ($provider === 'tesseract' && ! empty(config('financial.ai.openai.api_key'))) {
+            if ($aiEnabled && $provider === 'tesseract' && ! empty(config('financial.ai.openai.api_key'))) {
                 try {
                     $vision = $this->ocrManager->driver('vision')->extract(new OcrRequestData(
                         filePath: $ocrPath,
@@ -340,9 +354,9 @@ class ReceiptExtractionService
         return max($structured, $fromText);
     }
 
-    protected function preferredProvider(): string
+    protected function preferredProvider(bool $aiEnabled = true): string
     {
-        if (! empty(config('financial.ai.openai.api_key'))) {
+        if ($aiEnabled && ! empty(config('financial.ai.openai.api_key'))) {
             return 'vision';
         }
 

@@ -64,6 +64,7 @@ class WhatsAppInboundService
         }
 
         $chatId = $phone;
+        $aiEnabled = (bool) ($user->preferences['notifications']['inbound_ai_enabled'] ?? false);
 
         if ($parsed['text'] !== '') {
             $confirm = $this->receiptFlow->handleConfirmationText($user, 'whatsapp', $chatId, $parsed['text']);
@@ -75,7 +76,7 @@ class WhatsAppInboundService
             }
         }
 
-        if (($parsed['is_audio'] ?? false) && $parsed['media_path'] && $this->audioTranscription->isAvailable()) {
+        if (($parsed['is_audio'] ?? false) && $parsed['media_path'] && $aiEnabled && $this->audioTranscription->isAvailable()) {
             $transcription = $this->audioTranscription->transcribe($parsed['media_path']);
             if (is_file($parsed['media_path'])) {
                 @unlink($parsed['media_path']);
@@ -136,6 +137,7 @@ class WhatsAppInboundService
                 $parsed['mime'] ?? 'image/jpeg',
                 $caption !== '' ? $caption : null,
                 $parsed['original_file_name'] ?? null,
+                $aiEnabled,
             );
             $this->reply($phone, $flow['reply']);
             if (is_file($parsed['media_path'])) {
@@ -165,7 +167,16 @@ class WhatsAppInboundService
 
         $intent = $this->parser->parse($text);
         if (! $intent) {
-            $this->reply($phone, "Envie foto de comprovante ou texto: Gasto de 100 descrição.");
+            if ($voiceTranscription !== null) {
+                $this->reply(
+                    $phone,
+                    "🎤 Entendi: \"{$voiceTranscription}\"\n\n".
+                    "Mas não encontrei um valor. Inclua o valor no áudio ou envie texto:\n".
+                    '• Ex: "Despesa de 9.000 Multifilmes Goiânia"'
+                );
+            } else {
+                $this->reply($phone, "Envie foto de comprovante ou texto: Gasto de 100 descrição.");
+            }
 
             return ['handled' => true, 'reply' => 'unparsed'];
         }

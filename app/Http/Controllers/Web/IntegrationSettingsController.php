@@ -137,6 +137,7 @@ class IntegrationSettingsController extends Controller
             'whatsapp_api_token' => 'nullable|string|max:500',
             'notify_telegram' => 'sometimes|boolean',
             'notify_whatsapp' => 'sometimes|boolean',
+            'inbound_ai_enabled' => 'sometimes|boolean',
         ]);
 
         $user = $request->user();
@@ -181,6 +182,7 @@ class IntegrationSettingsController extends Controller
         $n['whatsapp_phone'] = $whatsappNormalized;
         $n['notify_telegram'] = $request->boolean('notify_telegram');
         $n['notify_whatsapp'] = $request->boolean('notify_whatsapp');
+        $n['inbound_ai_enabled'] = $request->boolean('inbound_ai_enabled');
 
         if ($validated['telegram_mode'] === 'own' && ! empty($validated['telegram_bot_token'])) {
             $n['telegram_bot_token_enc'] = Crypt::encryptString(trim($validated['telegram_bot_token']));

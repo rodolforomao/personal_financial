@@ -110,6 +110,7 @@ class IntegrationCredentialsResolver
             'whatsapp_user_key' => ! empty($this->decrypt($prefs['whatsapp_api_token_enc'] ?? null)),
             'notify_telegram' => (bool) ($prefs['notify_telegram'] ?? false),
             'notify_whatsapp' => (bool) ($prefs['notify_whatsapp'] ?? false),
+            'inbound_ai_enabled' => (bool) ($prefs['inbound_ai_enabled'] ?? false),
         ];
     }
 

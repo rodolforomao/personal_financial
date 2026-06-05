@@ -107,6 +107,8 @@ class TelegramInboundService
             return ['handled' => true, 'reply' => 'no_workspace'];
         }
 
+        $aiEnabled = (bool) ($user->preferences['notifications']['inbound_ai_enabled'] ?? false);
+
         if ($text !== '') {
             $background = $this->backgroundCommands->tryHandle($text, $user, $chatId);
             if ($background !== null) {
@@ -131,7 +133,7 @@ class TelegramInboundService
         }
 
         $voiceFileId = $this->extractVoiceFileId($message);
-        if ($voiceFileId && $this->audioTranscription->isAvailable()) {
+        if ($voiceFileId && $aiEnabled && $this->audioTranscription->isAvailable()) {
             $download = $this->telegram->downloadFile($voiceFileId, $token);
             if ($download['ok'] ?? false) {
                 $transcription = $this->audioTranscription->transcribe($download['path']);
@@ -192,6 +194,7 @@ class TelegramInboundService
                 $download['mime'] ?? 'image/jpeg',
                 $caption !== '' ? $caption : null,
                 $fileName !== '' ? $fileName : null,
+                $aiEnabled,
             );
             $this->reply($chatId, $flow['reply'], $token);
             if (isset($download['path']) && is_file($download['path'])) {
@@ -232,14 +235,24 @@ class TelegramInboundService
 
         $intent = $this->parser->parse($text);
         if (! $intent) {
-            $this->reply(
-                $chatId,
-                "Não entendi. Envie:\n".
-                "• Foto/PDF/XML de comprovante ou nota fiscal (confirmamos antes de salvar)\n".
-                "• Texto: Gasto de 16.000 descrição\n".
-                '• /help',
-                $token
-            );
+            if ($voiceTranscription !== null) {
+                $this->reply(
+                    $chatId,
+                    "🎤 Entendi: \"{$voiceTranscription}\"\n\n".
+                    "Mas não encontrei um valor. Inclua o valor no áudio ou envie texto:\n".
+                    '• Ex: "Despesa de 9.000 Multifilmes Goiânia"',
+                    $token
+                );
+            } else {
+                $this->reply(
+                    $chatId,
+                    "Não entendi. Envie:\n".
+                    "• Foto/PDF/XML de comprovante ou nota fiscal (confirmamos antes de salvar)\n".
+                    "• Texto: Gasto de 16.000 descrição\n".
+                    '• /help',
+                    $token
+                );
+            }
 
             return ['handled' => true, 'reply' => 'unparsed'];
         }

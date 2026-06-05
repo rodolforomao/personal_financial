@@ -28,6 +28,7 @@ class InboundReceiptFlowService
         string $mimeType,
         ?string $userCaption = null,
         ?string $originalFileName = null,
+        bool $aiEnabled = true,
     ): array {
         InboundReceiptDraft::query()
             ->where('user_id', $user->id)
@@ -37,7 +38,7 @@ class InboundReceiptFlowService
             ->update(['status' => InboundReceiptDraft::STATUS_CANCELLED]);
 
         try {
-            $extracted = $this->extraction->extractFromFile($localPath, $mimeType, $workspaceId, $originalFileName);
+            $extracted = $this->extraction->extractFromFile($localPath, $mimeType, $workspaceId, $originalFileName, $aiEnabled);
             if ($userCaption !== null && trim($userCaption) !== '') {
                 $extracted = $this->extraction->applyUserCaption($extracted, $userCaption, $workspaceId);
             }
