@@ -351,8 +351,7 @@
     <div class="alert alert-light border mb-3 small">
         <i class="bi bi-info-circle"></i>
         Exibindo até 60 grupos. Lançamentos com <strong>mesmo valor e datas próximas</strong> são listados para revisão.
-        Use <strong>"Não é duplicata"</strong> para ocultar falsos positivos.
-        Para excluir um lançamento, abra-o pelo botão <strong>Editar</strong>.
+        Use <strong>"Não é duplicata"</strong> para ocultar falsos positivos ou <strong>"Manter este"</strong> para unificar (exclui o outro).
     </div>
 
     @foreach($duplicateGroups as $group)
@@ -423,7 +422,16 @@
                             </span>
                         </td>
                         <td class="small text-muted">{{ $tx->source !== 'manual' ? $tx->source : '' }}</td>
-                        <td class="text-end">
+                        <td class="text-end text-nowrap">
+                            <form method="POST" action="{{ route('data-hygiene.merge-duplicate') }}" class="d-inline"
+                                  onsubmit="return confirm('Manter este lançamento (#{{ $tx->id }}) e excluir o outro? Esta ação não pode ser desfeita.')">
+                                @csrf
+                                <input type="hidden" name="keep_id" value="{{ $tx->id }}">
+                                <input type="hidden" name="delete_id" value="{{ $txList->firstWhere('id', '!=', $tx->id)?->id }}">
+                                <button type="submit" class="btn btn-xs btn-sm btn-outline-success" title="Manter este e excluir o outro">
+                                    <i class="bi bi-check2-square"></i> Manter este
+                                </button>
+                            </form>
                             <a href="{{ route('transactions.edit', $tx) }}" class="btn btn-xs btn-outline-secondary btn-sm">
                                 Editar
                             </a>

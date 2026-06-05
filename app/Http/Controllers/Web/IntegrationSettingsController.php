@@ -32,6 +32,9 @@ class IntegrationSettingsController extends Controller
         $workspaceId = (int) $request->attributes->get('workspace_id');
         $gmail = app(GmailOAuthService::class);
         $gmailConnection = $gmail->connection($workspaceId, $user->id);
+        $allGmailConnections = $gmail->connectionsForWorkspace($workspaceId)
+            ->load('user')
+            ->values();
 
         return view('integrations.settings', [
             'status' => $resolver->status($user->id),
@@ -46,6 +49,7 @@ class IntegrationSettingsController extends Controller
                 'configured' => $gmail->configured(),
                 'connection' => $gmailConnection,
                 'email' => $gmailConnection?->settings['email'] ?? $gmailConnection?->credentials['email'] ?? null,
+                'allConnections' => $allGmailConnections,
             ],
             'canViewOperationalDetails' => $canViewOperationalDetails,
             'operationsGuideHtml' => app(PlatformOperationsGuide::class)->webCardHtml(),

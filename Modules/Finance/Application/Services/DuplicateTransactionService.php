@@ -5,6 +5,7 @@ namespace Modules\Finance\Application\Services;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Finance\Infrastructure\Models\Transaction;
+use Modules\OCR\Infrastructure\Models\Document;
 
 /**
  * Detecta pares/grupos de transações possivelmente duplicadas dentro de um workspace.
@@ -100,6 +101,43 @@ class DuplicateTransactionService
     public function countGroups(int $workspaceId): int
     {
         return $this->findGroups($workspaceId)->count();
+    }
+
+    /**
+     * Mantém uma transação, transfere documentos da outra para ela e a exclui (soft-delete).
+     *
+     * @throws \InvalidArgumentException Se qualquer um dos IDs não for encontrado no workspace.
+     */
+    public function merge(int $workspaceId, int $keepId, int $deleteId): void
+    {
+        $transactions = Transaction::query()
+            ->where('workspace_id', $workspaceId)
+            ->whereIn('id', [$keepId, $deleteId])
+            ->get();
+
+        if ($transactions->count() < 2) {
+            throw new \InvalidArgumentException('Uma ou ambas as transações não foram encontradas neste workspace.');
+        }
+
+        $kept    = $transactions->firstWhere('id', $keepId);
+        $deleted = $transactions->firstWhere('id', $deleteId);
+
+        if (! $kept || ! $deleted) {
+            throw new \InvalidArgumentException('Uma ou ambas as transações não foram encontradas neste workspace.');
+        }
+
+        // Transfere documentos do duplicado para o lançamento mantido
+        Document::query()
+            ->where('transaction_id', $deleteId)
+            ->update(['transaction_id' => $keepId]);
+
+        // Registra no metadata qual lançamento foi absorvido
+        $meta = (array) ($kept->metadata ?? []);
+        $meta['merged_from_id'] = $deleteId;
+        $kept->update(['metadata' => $meta]);
+
+        // Exclui o duplicado (soft-delete)
+        $deleted->delete();
     }
 
     /** Adiciona o id da transação "irmã" na lista de dismissals de ambas as transações. */

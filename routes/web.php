@@ -77,6 +77,7 @@ Route::middleware(['auth', SetWebWorkspace::class])->group(function () {
         Route::post('data-hygiene/bulk-assign', [DataHygieneController::class, 'bulkAssign'])->name('data-hygiene.bulk-assign');
         Route::post('data-hygiene/auto-assign-operations', [DataHygieneController::class, 'autoAssignOperations'])->name('data-hygiene.auto-assign-operations');
         Route::post('data-hygiene/dismiss-duplicate', [DataHygieneController::class, 'dismissDuplicate'])->name('data-hygiene.dismiss-duplicate');
+        Route::post('data-hygiene/merge-duplicate', [DataHygieneController::class, 'mergeDuplicate'])->name('data-hygiene.merge-duplicate');
 
         Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
         Route::post('categories', [CategoryController::class, 'store'])->name('categories.store');

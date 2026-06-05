@@ -142,6 +142,25 @@ class DataHygieneController extends Controller
             ->with('success', $msg);
     }
 
+    public function mergeDuplicate(Request $request, DuplicateTransactionService $duplicates): RedirectResponse
+    {
+        $workspaceId = (int) $request->attributes->get('workspace_id');
+
+        $validated = $request->validate([
+            'keep_id'   => 'required|integer',
+            'delete_id' => 'required|integer',
+        ]);
+
+        try {
+            $duplicates->merge($workspaceId, (int) $validated['keep_id'], (int) $validated['delete_id']);
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('data-hygiene.index', ['tab' => 'duplicates'])
+            ->with('success', 'Lançamentos unificados. O duplicado foi excluído.');
+    }
+
     public function dismissDuplicate(Request $request, DuplicateTransactionService $duplicates): RedirectResponse
     {
         $workspaceId = (int) $request->attributes->get('workspace_id');

@@ -269,72 +269,114 @@
         </div>
 
         <div class="card mb-4">
-            <div class="card-header"><h3 class="card-title"><i class="bi bi-envelope"></i> Gmail</h3></div>
-            <div class="card-body">
-                <p class="text-muted small">
-                    Conecte uma conta Google para ler e-mails recentes de compras, PIX, boletos, faturas, notas fiscais
-                    e recebimentos. Cada usuário conecta o próprio Gmail via OAuth; o sistema cria transações com
-                    <code>source=gmail</code> e evita duplicar mensagens já lidas.
-                </p>
-
-                @if($gmail['configured'])
-                    @if($gmail['connection'])
-                        <div class="alert alert-success py-2">
-                            <i class="bi bi-check-circle"></i>
-                            Gmail conectado
-                            @if($gmail['email'])
-                                — <strong>{{ $gmail['email'] }}</strong>
-                            @endif
-                            @if($gmail['connection']->last_sync_at)
-                                <br><small>Última sincronização: {{ $gmail['connection']->last_sync_at->format('d/m/Y H:i') }}</small>
-                            @endif
-                        </div>
-                        @if($gmail['connection']->last_error)
-                            <div class="alert alert-warning py-2">
-                                Último erro: {{ $gmail['connection']->last_error }}
-                            </div>
-                        @endif
-                    @else
-                        <div class="alert alert-light border py-2 mb-3">
-                            Gmail ainda não conectado neste workspace.
-                        </div>
-                    @endif
-                @else
-                    <div class="alert alert-warning py-2">
-                        @if($canViewOperationalDetails)
-                            Admin: configure a credencial OAuth do aplicativo Google
-                            (<code>GMAIL_CLIENT_ID</code>, <code>GMAIL_CLIENT_SECRET</code> e <code>GMAIL_REDIRECT_URI</code>).
-                            A conta Gmail e os tokens de cada usuário são salvos criptografados no banco, não no <code>.env</code>.
-                        @else
-                            Gmail ainda não está disponível para conexão. Fale com o suporte para liberar esse recurso.
-                        @endif
-                    </div>
-                @endif
-
-                <p class="small text-muted mb-0">
-                    Escopo usado: leitura somente (<code>gmail.readonly</code>). Nenhum e-mail é alterado ou apagado.
-                    A conexão abaixo vale apenas para o seu usuário neste workspace.
-                </p>
-            </div>
-            <div class="card-footer d-flex flex-wrap gap-2">
-                @if($gmail['configured'])
-                    <a href="{{ route('integrations.gmail.connect') }}" class="btn btn-outline-primary">
-                        <i class="bi bi-google"></i>
-                        {{ $gmail['connection'] ? 'Reconectar Gmail' : 'Conectar Gmail' }}
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0"><i class="bi bi-envelope"></i> Gmail — Importação de e-mails</h3>
+                @if($gmail['configured'] && !$gmail['connection'])
+                    <a href="{{ route('integrations.gmail.connect') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-google"></i> Conectar meu Gmail
                     </a>
                 @endif
-                @if($gmail['connection'])
-                    <button type="submit" formmethod="post" formaction="{{ route('integrations.gmail.sync') }}" class="btn btn-outline-success">
-                        <i class="bi bi-arrow-repeat"></i> Sincronizar agora
-                    </button>
-                    <button type="submit"
-                            formmethod="post"
-                            formaction="{{ route('integrations.gmail.disconnect') }}"
-                            onclick="event.preventDefault(); const f=this.form; const m=document.createElement('input'); m.type='hidden'; m.name='_method'; m.value='DELETE'; f.appendChild(m); f.action=this.formAction; f.submit();"
-                            class="btn btn-outline-danger">
-                        Desconectar
-                    </button>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Conecte contas Gmail para importar automaticamente e-mails de compras, PIX, boletos, faturas
+                    e recebimentos como transações. Cada usuário conecta o próprio Gmail; múltiplas contas
+                    podem ser conectadas no mesmo workspace.
+                </p>
+
+                @if(!$gmail['configured'])
+                    <div class="alert alert-warning py-2 mb-0">
+                        @if($canViewOperationalDetails)
+                            <strong>Admin:</strong> configure as credenciais OAuth do Google
+                            (<code>GMAIL_CLIENT_ID</code>, <code>GMAIL_CLIENT_SECRET</code>, <code>GMAIL_REDIRECT_URI</code>) no <code>.env</code>
+                            para habilitar essa integração.
+                        @else
+                            Gmail ainda não disponível. Fale com o suporte.
+                        @endif
+                    </div>
+                @elseif($gmail['allConnections']->isEmpty())
+                    <div class="alert alert-light border py-2 mb-0">
+                        <i class="bi bi-envelope-slash"></i>
+                        Nenhuma conta Gmail conectada neste workspace.
+                        <a href="{{ route('integrations.gmail.connect') }}" class="ms-2">Conectar agora</a>
+                    </div>
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Usuário</th>
+                                    <th>Conta Gmail</th>
+                                    <th>Última sincronização</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($gmail['allConnections'] as $conn)
+                                @php
+                                    $connEmail = $conn->settings['email'] ?? $conn->credentials['email'] ?? '—';
+                                    $isOwn = $conn->user_id == auth()->id();
+                                    $statusBadge = match($conn->status) {
+                                        'active' => ['success', 'Ativo'],
+                                        'error'  => ['danger', 'Erro'],
+                                        default  => ['secondary', $conn->status],
+                                    };
+                                @endphp
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">{{ $conn->user?->name ?? 'Usuário #'.$conn->user_id }}</div>
+                                        @if($isOwn)<small class="text-muted">Você</small>@endif
+                                    </td>
+                                    <td><code class="small">{{ $connEmail }}</code></td>
+                                    <td class="small text-muted">
+                                        {{ $conn->last_sync_at?->format('d/m/Y H:i') ?? 'Nunca' }}
+                                    </td>
+                                    <td>
+                                        <span class="badge text-bg-{{ $statusBadge[0] }}">{{ $statusBadge[1] }}</span>
+                                        @if($conn->last_error && $isOwn)
+                                            <div class="text-danger small">{{ \Illuminate\Support\Str::limit($conn->last_error, 60) }}</div>
+                                        @endif
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        @if($isOwn)
+                                            <form method="POST" action="{{ route('integrations.gmail.sync') }}" class="d-inline">
+                                                @csrf
+                                                <button type="submit"
+                                                        class="btn btn-sm btn-outline-success"
+                                                        title="Sincronizar agora">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </button>
+                                            </form>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    onclick="if(confirm('Desconectar Gmail {{ $connEmail }}?')){const f=document.getElementById('integrations-form');const m=document.createElement('input');m.type='hidden';m.name='_method';m.value='DELETE';f.appendChild(m);f.action='{{ route('integrations.gmail.disconnect') }}';f.submit();}"
+                                                    title="Desconectar">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                            <a href="{{ route('integrations.gmail.connect') }}" class="btn btn-sm btn-outline-secondary" title="Reconectar">
+                                                <i class="bi bi-arrow-clockwise"></i>
+                                            </a>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @if(!$gmail['connection'])
+                        <div class="mt-3">
+                            <a href="{{ route('integrations.gmail.connect') }}" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-google"></i> Conectar meu Gmail também
+                            </a>
+                        </div>
+                    @endif
                 @endif
+
+                <p class="small text-muted mt-3 mb-0">
+                    <i class="bi bi-shield-check"></i>
+                    Escopo: somente leitura (<code>gmail.readonly</code>). Nenhum e-mail é alterado ou apagado.
+                </p>
             </div>
         </div>
 
