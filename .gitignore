@@ -6,6 +6,7 @@
 .env_deploy
 .phpactor.json
 .phpunit.result.cache
+/.claude/worktrees/
 /.codex
 /.cursor/
 /.idea
