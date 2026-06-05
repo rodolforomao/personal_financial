@@ -6,12 +6,6 @@
     <li class="breadcrumb-item active">Relatórios</li>
 @endsection
 
-@push('styles')
-@if(($view ?? 'resumo') === 'detalhado')
-<link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.bootstrap5.min.css">
-@endif
-@endpush
-
 @section('content')
 @php
     $totals = $report['totals'];
@@ -131,22 +125,22 @@
 })();
 </script>
 @if($isDetail && count($detailRows) > 0)
-<script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/2.0.8/js/dataTables.bootstrap5.min.js"></script>
 <script>
 (function () {
     const tableEl = document.getElementById('report-transactions-table');
     if (!tableEl || typeof DataTable === 'undefined') return;
 
     new DataTable(tableEl, {
+        searching: true,
         order: [[2, 'asc'], [0, 'asc']],
         pageLength: 25,
-        lengthMenu: [10, 25, 50, 100, 250],
+        lengthMenu: [[10, 25, 50, 100, 250, -1], ['10', '25', '50', '100', '250', 'Todos']],
         language: {
             url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/pt-BR.json',
         },
         columnDefs: [
             { targets: 7, className: 'text-end' },
+            { targets: -1, orderable: false, searchable: false },
         ],
     });
 })();

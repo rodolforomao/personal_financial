@@ -211,14 +211,13 @@
         @endif
 
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex align-items-center gap-2 flex-wrap">
                 <h3 class="card-title mb-0">Regras cadastradas</h3>
-                <div class="card-tools">
-                    <a href="{{ route('transactions.index') }}" class="btn btn-sm btn-outline-secondary">Transações</a>
-                </div>
+                <input type="search" id="cat-rules-search" class="form-control form-control-sm ms-auto" style="max-width:240px" placeholder="Buscar regra...">
+                <a href="{{ route('transactions.index') }}" class="btn btn-sm btn-outline-secondary">Transações</a>
             </div>
             <div class="card-body table-responsive p-0">
-                <table class="table table-hover table-sm mb-0">
+                <table id="cat-rules-table" class="table table-hover table-sm mb-0">
                     <thead>
                         <tr>
                             <th>Nome</th>
@@ -387,6 +386,19 @@
         placeholder: el.dataset.placeholder || 'Adicione nomes…',
         allowClear: true,
         closeOnSelect: false,
+    });
+})();
+</script>
+<script>
+(function () {
+    const input = document.getElementById('cat-rules-search');
+    const table = document.getElementById('cat-rules-table');
+    if (!input || !table) return;
+    input.addEventListener('input', function () {
+        const q = this.value.toLowerCase();
+        table.querySelectorAll('tbody tr:not(.collapse)').forEach(function (row) {
+            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
     });
 })();
 </script>

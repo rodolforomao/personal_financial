@@ -62,7 +62,7 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-body table-responsive p-0">
-                <table class="table table-hover mb-0">
+                <table id="dt-assets" class="table table-hover mb-0">
                     <thead>
                         <tr><th>Nome</th><th>Tipo</th><th class="text-end">Valor atual</th><th></th></tr>
                     </thead>
@@ -89,6 +89,18 @@
         </div>
     </div>
 </div>
+
+@push('scripts')
+<script>
+new DataTable('#dt-assets', {
+    searching: true,
+    pageLength: 25,
+    lengthMenu: [[10, 25, 50, 100, 250, -1], ['10', '25', '50', '100', '250', 'Todos']],
+    language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/pt-BR.json' },
+    columnDefs: [{ targets: -1, orderable: false, searchable: false }],
+});
+</script>
+@endpush
 
 @foreach($assets as $asset)
 <div class="modal fade" id="edit-asset-{{ $asset->id }}" tabindex="-1">

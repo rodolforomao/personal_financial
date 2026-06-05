@@ -23,7 +23,7 @@ class CompanyController extends Controller
                 ->with('contracts')
                 ->orderBy('type')
                 ->orderBy('name')
-                ->paginate(15),
+                ->get(),
             'byType' => Company::query()
                 ->where('workspace_id', $workspaceId)
                 ->selectRaw('type, count(*) as total')

@@ -20,7 +20,7 @@
         </div>
     </div>
     <div class="card-body table-responsive p-0">
-        <table class="table table-hover mb-0">
+        <table id="dt-projects" class="table table-hover mb-0">
             <thead>
                 <tr>
                     <th>Projeto</th>
@@ -64,6 +64,18 @@
             </tbody>
         </table>
     </div>
-    <div class="card-footer">{{ $projects->links() }}</div>
+    </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+new DataTable('#dt-projects', {
+    searching: true,
+    pageLength: 25,
+    lengthMenu: [[10, 25, 50, 100, 250, -1], ['10', '25', '50', '100', '250', 'Todos']],
+    language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/pt-BR.json' },
+    columnDefs: [{ targets: -1, orderable: false, searchable: false }],
+});
+</script>
+@endpush

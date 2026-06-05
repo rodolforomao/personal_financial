@@ -13,7 +13,7 @@
         <a href="{{ route('operations.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nova operação</a>
     </div>
     <div class="card-body table-responsive p-0">
-        <table class="table table-hover mb-0">
+        <table id="dt-operations" class="table table-hover mb-0">
             <thead>
                 <tr>
                     <th>Operação</th>
@@ -44,6 +44,19 @@
         </table>
     </div>
 </div>
+
+@push('scripts')
+<script>
+new DataTable('#dt-operations', {
+    searching: true,
+    pageLength: 25,
+    lengthMenu: [[10, 25, 50, 100, 250, -1], ['10', '25', '50', '100', '250', 'Todos']],
+    language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/pt-BR.json' },
+    columnDefs: [{ targets: -1, orderable: false, searchable: false }],
+});
+</script>
+@endpush
+
 <p class="text-muted small mb-0">
     Lançamentos vinculados a uma operação não entram no Dashboard principal — apenas receitas/despesas da sua vida financeira geral.
 </p>

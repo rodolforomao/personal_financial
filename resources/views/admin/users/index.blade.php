@@ -184,7 +184,7 @@
                         </p>
                     </div>
                     <div class="d-flex flex-wrap align-items-center gap-2">
-                        <span class="text-muted small">{{ $users->total() }} usuário(s) encontrados</span>
+                        <span class="text-muted small">{{ $users->count() }} usuário(s) encontrados</span>
                         <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#invite-user-modal">
                             <i class="bi bi-person-plus me-1"></i>
                             Convidar usuário
@@ -193,7 +193,7 @@
                 </div>
 
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle admin-users-table">
+                    <table id="dt-users" class="table table-hover align-middle admin-users-table">
                         <thead>
                             <tr>
                                 <th>Usuário</th>
@@ -274,7 +274,6 @@
                         </tbody>
                     </table>
                 </div>
-                {{ $users->links() }}
             </div>
 
             <div class="tab-pane fade" id="profiles-pane" role="tabpanel" aria-labelledby="profiles-tab" tabindex="0">
@@ -723,4 +722,16 @@
     </script>
     @endpush
 @endif
+
+@push('scripts')
+<script>
+new DataTable('#dt-users', {
+    searching: true,
+    pageLength: 25,
+    lengthMenu: [[10, 25, 50, 100, 250, -1], ['10', '25', '50', '100', '250', 'Todos']],
+    language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/pt-BR.json' },
+    columnDefs: [{ targets: -1, orderable: false, searchable: false }],
+});
+</script>
+@endpush
 @endsection

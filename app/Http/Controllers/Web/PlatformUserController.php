@@ -32,11 +32,11 @@ class PlatformUserController extends Controller
             ])
             ->withCount('accessPayments')
             ->orderBy('name')
-            ->paginate(25);
+            ->get();
 
         $gmailConnections = IntegrationConnection::query()
             ->where('provider', 'gmail')
-            ->whereIn('user_id', $users->getCollection()->pluck('id'))
+            ->whereIn('user_id', $users->pluck('id'))
             ->latest('updated_at')
             ->get()
             ->keyBy('user_id');

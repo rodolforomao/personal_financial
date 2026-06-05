@@ -116,7 +116,7 @@
 {{-- Tabela --}}
 <div class="card">
     <div class="card-body table-responsive p-0">
-        <table class="table table-hover table-sm mb-0">
+        <table id="dt-income" class="table table-hover table-sm mb-0">
             <thead>
                 <tr>
                     <th style="width:90px">Data</th>
@@ -181,6 +181,21 @@
 @endsection
 
 @push('scripts')
+<script>
+new DataTable('#dt-income', {
+    searching: true,
+    paging: false,
+    info: false,
+    language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/pt-BR.json' },
+    columnDefs: [{ targets: -1, orderable: false, searchable: false }],
+    layout: {
+        topStart: 'search',
+        topEnd: null,
+        bottomStart: null,
+        bottomEnd: null,
+    },
+});
+</script>
 <script>
 (function () {
     const collapse = document.getElementById('income-filter-body');

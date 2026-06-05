@@ -239,7 +239,7 @@
         <div class="card">
             <div class="card-header"><h3 class="card-title">Receitas cadastradas</h3></div>
             <div class="card-body table-responsive p-0">
-                <table class="table table-hover table-sm mb-0">
+                <table id="dt-recurring-income" class="table table-hover table-sm mb-0">
                     <thead>
                         <tr>
                             <th>Receita</th>
@@ -354,6 +354,15 @@
 @endsection
 
 @push('scripts')
+<script>
+new DataTable('#dt-recurring-income', {
+    searching: true,
+    pageLength: 25,
+    lengthMenu: [[10, 25, 50, 100, 250, -1], ['10', '25', '50', '100', '250', 'Todos']],
+    language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/pt-BR.json' },
+    columnDefs: [{ targets: -1, orderable: false, searchable: false }],
+});
+</script>
 <script>
 (function () {
     const indexMeta = {

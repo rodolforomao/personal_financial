@@ -130,9 +130,12 @@
     </div>
     <div class="col-lg-7">
         <div class="card">
-            <div class="card-header"><h3 class="card-title">Vínculos cadastrados</h3></div>
+            <div class="card-header d-flex align-items-center gap-2">
+                <h3 class="card-title mb-0">Vínculos cadastrados</h3>
+                <input type="search" id="clt-search" class="form-control form-control-sm ms-auto" style="max-width:220px" placeholder="Buscar...">
+            </div>
             <div class="card-body table-responsive p-0">
-                <table class="table table-hover mb-0">
+                <table id="clt-salaries-table" class="table table-hover mb-0">
                     <thead>
                         <tr>
                             <th>Empregador</th>
@@ -205,3 +208,19 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const input = document.getElementById('clt-search');
+    const table = document.getElementById('clt-salaries-table');
+    if (!input || !table) return;
+    input.addEventListener('input', function () {
+        const q = this.value.toLowerCase();
+        table.querySelectorAll('tbody tr:not(.collapse)').forEach(function (row) {
+            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+})();
+</script>
+@endpush

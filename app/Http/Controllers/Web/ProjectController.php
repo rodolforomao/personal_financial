@@ -19,7 +19,7 @@ class ProjectController extends Controller
                 ->where('workspace_id', $request->attributes->get('workspace_id'))
                 ->with(['company', 'milestones'])
                 ->latest()
-                ->paginate(15),
+                ->get(),
         ]);
     }
 

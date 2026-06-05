@@ -48,7 +48,7 @@
         <div class="card">
             <div class="card-header"><h3 class="card-title">Gastos por categoria (mês atual)</h3></div>
             <div class="card-body p-0">
-                <table class="table table-hover mb-0">
+                <table id="dt-categories" class="table table-hover mb-0">
                     <thead><tr><th>Categoria</th><th class="text-end">Total</th><th></th></tr></thead>
                     <tbody>
                         @forelse($categories as $cat)
@@ -76,3 +76,15 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+new DataTable('#dt-categories', {
+    searching: true,
+    pageLength: 25,
+    lengthMenu: [[10, 25, 50, 100, 250, -1], ['10', '25', '50', '100', '250', 'Todos']],
+    language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/pt-BR.json' },
+    columnDefs: [{ targets: -1, orderable: false, searchable: false }],
+});
+</script>
+@endpush

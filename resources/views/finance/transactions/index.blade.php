@@ -227,7 +227,7 @@
         </div>
     </div>
     <div class="card-body table-responsive p-0">
-        <table class="table table-striped table-hover mb-0">
+        <table id="dt-transactions" class="table table-striped table-hover mb-0">
             <thead>
                 <tr>
                     <th style="width:36px">
@@ -319,6 +319,24 @@
 @endsection
 
 @push('scripts')
+<script>
+new DataTable('#dt-transactions', {
+    searching: true,
+    paging: false,
+    info: false,
+    language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/pt-BR.json' },
+    columnDefs: [
+        { targets: 0, orderable: false, searchable: false },
+        { targets: -1, orderable: false, searchable: false },
+    ],
+    layout: {
+        topStart: 'search',
+        topEnd: null,
+        bottomStart: null,
+        bottomEnd: null,
+    },
+});
+</script>
 <script>
 (function () {
     const opSelect = document.getElementById('filter-operation-id');
